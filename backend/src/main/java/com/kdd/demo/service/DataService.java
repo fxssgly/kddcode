@@ -8,9 +8,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStreamReader;
+import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -29,6 +28,7 @@ public class DataService {
     private final IrisRepository irisRepository;
     private final TransactionItemRepository transactionRepository;
     private final boolean useMysql;
+    private final Charset gbk = Charset.forName("GBK");
     private List<Map<String, Object>> uploadedIrisRows;
     private List<List<String>> uploadedTransactions;
 
@@ -42,6 +42,22 @@ public class DataService {
     }
 
     public List<Map<String, Object>> getIrisRows() {
+        return getIrisRows(Paths.get("data", "iris_sample.csv"));
+    }
+
+    public List<Map<String, Object>> getClusteringIrisRows() {
+        return getIrisRows(Paths.get("data", "iris.csv"));
+    }
+
+    public List<Map<String, Object>> getClassificationIrisRows() {
+        return getIrisRows(Paths.get("data", "iris2.csv"));
+    }
+
+    public List<Map<String, Object>> getRegressionRows() {
+        return readRegressionCsv(Paths.get("data", "regression_experiment.csv"));
+    }
+
+    private List<Map<String, Object>> getIrisRows(Path csvPath) {
         if (uploadedIrisRows != null) {
             return uploadedIrisRows;
         }
@@ -58,7 +74,7 @@ public class DataService {
                 // MySQL is optional for classroom demos. Fall back to CSV when it is unavailable.
             }
         }
-        return readIrisCsv(Paths.get("data", "iris_sample.csv"));
+        return readIrisCsv(csvPath);
     }
 
     public List<List<String>> getTransactions() {
@@ -71,7 +87,7 @@ public class DataService {
                 if (!rows.isEmpty()) {
                     Map<Integer, List<String>> grouped = new TreeMap<>();
                     for (TransactionItem row : rows) {
-                        grouped.computeIfAbsent(row.getTransactionId(), key -> new ArrayList<>()).add(row.getItemName());
+                        grouped.computeIfAbsent(row.getTransactionId(), key -> new ArrayList<>()).add(repairText(row.getItemName()));
                     }
                     return new ArrayList<>(grouped.values());
                 }
@@ -92,6 +108,10 @@ public class DataService {
         return uploadedTransactions;
     }
 
+    public List<Map<String, Object>> uploadRegression(MultipartFile file) throws IOException {
+        return parseRegressionLines(readTextLines(file.getBytes()));
+    }
+
     private Map<String, Object> toIrisMap(IrisSample sample) {
         Map<String, Object> row = new LinkedHashMap<>();
         row.put("id", sample.getId());
@@ -105,7 +125,7 @@ public class DataService {
 
     private List<Map<String, Object>> readIrisCsv(Path path) {
         try {
-            return parseIrisLines(Files.readAllLines(path, StandardCharsets.UTF_8));
+            return parseIrisLines(readTextLines(Files.readAllBytes(path)));
         } catch (IOException ex) {
             throw new IllegalStateException("Cannot read iris CSV: " + path.toAbsolutePath(), ex);
         }
@@ -113,26 +133,41 @@ public class DataService {
 
     private List<List<String>> readTransactionsCsv(Path path) {
         try {
-            return parseTransactionLines(Files.readAllLines(path, StandardCharsets.UTF_8));
+            return parseTransactionLines(readTextLines(Files.readAllBytes(path)));
         } catch (IOException ex) {
             throw new IllegalStateException("Cannot read transactions CSV: " + path.toAbsolutePath(), ex);
         }
     }
 
-    private List<Map<String, Object>> parseIris(MultipartFile file) throws IOException {
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(file.getInputStream(), StandardCharsets.UTF_8))) {
-            return parseIrisLines(reader.lines().collect(Collectors.toList()));
+    private List<Map<String, Object>> readRegressionCsv(Path path) {
+        try {
+            return parseRegressionLines(readTextLines(Files.readAllBytes(resolveDataPath(path))));
+        } catch (IOException ex) {
+            throw new IllegalStateException("Cannot read regression CSV: " + path.toAbsolutePath(), ex);
         }
     }
 
-    private List<List<String>> parseTransactions(MultipartFile file) throws IOException {
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(file.getInputStream(), StandardCharsets.UTF_8))) {
-            List<String> lines = reader.lines().collect(Collectors.toList());
-            if (!lines.isEmpty() && lines.get(0).toLowerCase().contains("species")) {
-                return irisRowsToTransactions(parseIrisLines(lines));
-            }
-            return parseTransactionLines(lines);
+    private Path resolveDataPath(Path path) {
+        if (Files.exists(path)) {
+            return path;
         }
+        Path backendPath = Paths.get("backend").resolve(path);
+        if (Files.exists(backendPath)) {
+            return backendPath;
+        }
+        return path;
+    }
+
+    private List<Map<String, Object>> parseIris(MultipartFile file) throws IOException {
+        return parseIrisLines(readTextLines(file.getBytes()));
+    }
+
+    private List<List<String>> parseTransactions(MultipartFile file) throws IOException {
+        List<String> lines = readTextLines(file.getBytes());
+        if (!lines.isEmpty() && lines.get(0).toLowerCase().contains("species")) {
+            return irisRowsToTransactions(parseIrisLines(lines));
+        }
+        return parseTransactionLines(lines);
     }
 
     private List<Map<String, Object>> parseIrisLines(List<String> lines) {
@@ -162,6 +197,31 @@ public class DataService {
         return rows;
     }
 
+    private List<Map<String, Object>> parseRegressionLines(List<String> lines) {
+        List<Map<String, Object>> rows = new ArrayList<>();
+        if (lines.isEmpty()) {
+            return rows;
+        }
+        String[] headers = splitCsvLine(lines.get(0));
+        for (int index = 1; index < lines.size(); index++) {
+            if (lines.get(index).trim().isEmpty()) {
+                continue;
+            }
+            String[] values = splitCsvLine(lines.get(index));
+            Map<String, String> raw = new LinkedHashMap<>();
+            for (int i = 0; i < headers.length && i < values.length; i++) {
+                raw.put(headers[i].trim(), values[i].trim());
+            }
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("id", (int) numberValue(raw, index, "id", "ID"));
+            row.put("x", numberValue(raw, 0, "x", "X"));
+            row.put("y", numberValue(raw, 0, "y", "Y"));
+            row.put("type", stringValue(raw, "正常点", "type", "Type"));
+            rows.add(row);
+        }
+        return rows;
+    }
+
     private List<List<String>> parseTransactionLines(List<String> lines) {
         List<List<String>> transactions = new ArrayList<>();
         for (int index = 0; index < lines.size(); index++) {
@@ -175,6 +235,7 @@ public class DataService {
             List<String> items = Arrays.stream(parts)
                     .skip(1)
                     .map(String::trim)
+                    .map(this::repairText)
                     .filter(value -> !value.isEmpty())
                     .distinct()
                     .collect(Collectors.toList());
@@ -223,10 +284,50 @@ public class DataService {
         for (String name : names) {
             String value = raw.get(name);
             if (value != null && !value.isBlank()) {
-                return value;
+                return repairText(value);
             }
         }
         return defaultValue;
+    }
+
+    private List<String> readTextLines(byte[] bytes) {
+        String utf8Text = new String(bytes, StandardCharsets.UTF_8);
+        String gbkText = new String(bytes, gbk);
+        String text = scoreText(gbkText) < scoreText(utf8Text) ? gbkText : utf8Text;
+        return Arrays.stream(repairText(text).split("\\R"))
+                .collect(Collectors.toList());
+    }
+
+    private String repairText(String value) {
+        if (value == null || value.isBlank()) {
+            return value;
+        }
+        String repaired = repairGbkDecodedUtf8(value);
+        return scoreText(repaired) < scoreText(value) ? repaired : value;
+    }
+
+    private String repairGbkDecodedUtf8(String value) {
+        try {
+            return new String(value.getBytes(gbk), StandardCharsets.UTF_8);
+        } catch (RuntimeException ex) {
+            return value;
+        }
+    }
+
+    private int scoreText(String text) {
+        int score = 0;
+        for (int index = 0; index < text.length(); index++) {
+            if (text.charAt(index) == '\uFFFD') {
+                score += 10;
+            }
+        }
+        String[] mojibakeTokens = {"锟", "Ã", "Â", "å", "æ", "ç", "闈", "鍏", "鏁", "绫", "灏", "瀹", "搴", "鐑"};
+        for (String token : mojibakeTokens) {
+            if (text.contains(token)) {
+                score += 5;
+            }
+        }
+        return score;
     }
 
     private String[] splitCsvLine(String line) {

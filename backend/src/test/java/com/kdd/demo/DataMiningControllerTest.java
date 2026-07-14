@@ -4,10 +4,14 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.MockMvc;
+
+import java.nio.charset.Charset;
 
 import static org.hamcrest.Matchers.greaterThan;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -61,5 +65,17 @@ class DataMiningControllerTest {
                         .content("{\"min_support\":0.2,\"min_confidence\":0.4}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.rules").isArray());
+    }
+
+    @Test
+    void uploadedTransactionCsvSupportsChineseGbk() throws Exception {
+        byte[] content = "transaction_id,items\n1,牛奶,面包\n2,牛奶,鸡蛋\n"
+                .getBytes(Charset.forName("GBK"));
+        MockMultipartFile file = new MockMultipartFile("file", "transactions.csv", "text/csv", content);
+
+        mockMvc.perform(multipart("/api/transactions/upload").file(file))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.transactions[0][0]").value("牛奶"))
+                .andExpect(jsonPath("$.transactions[0][1]").value("面包"));
     }
 }

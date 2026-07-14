@@ -48,8 +48,15 @@ public class DataMiningController {
     }
 
     @GetMapping("/api/iris")
-    public Map<String, Object> iris() {
-        List<Map<String, Object>> rows = dataService.getIrisRows();
+    public Map<String, Object> iris(@RequestParam(value = "dataset", defaultValue = "default") String dataset) {
+        List<Map<String, Object>> rows;
+        if ("clustering".equalsIgnoreCase(dataset)) {
+            rows = dataService.getClusteringIrisRows();
+        } else if ("classification".equalsIgnoreCase(dataset)) {
+            rows = dataService.getClassificationIrisRows();
+        } else {
+            rows = dataService.getIrisRows();
+        }
         Map<String, Object> result = new HashMap<>();
         result.put("total", rows.size());
         result.put("rows", rows);
@@ -59,6 +66,15 @@ public class DataMiningController {
     @PostMapping("/api/iris/upload")
     public Map<String, Object> uploadIris(@RequestParam("file") MultipartFile file) throws IOException {
         List<Map<String, Object>> rows = dataService.uploadIris(file);
+        Map<String, Object> result = new HashMap<>();
+        result.put("total", rows.size());
+        result.put("rows", rows);
+        return result;
+    }
+
+    @PostMapping("/api/regression/upload")
+    public Map<String, Object> uploadRegression(@RequestParam("file") MultipartFile file) throws IOException {
+        List<Map<String, Object>> rows = dataService.uploadRegression(file);
         Map<String, Object> result = new HashMap<>();
         result.put("total", rows.size());
         result.put("rows", rows);
@@ -95,7 +111,7 @@ public class DataMiningController {
     @PostMapping("/api/clustering")
     public Map<String, Object> clustering(@RequestBody Map<String, Object> body) {
         Map<String, Object> payload = new HashMap<>();
-        payload.put("rows", dataService.getIrisRows());
+        payload.put("rows", dataService.getClusteringIrisRows());
         payload.put("k", (int) number(body, "k", 3));
         return algorithmService.run("clustering", payload);
     }
@@ -103,7 +119,7 @@ public class DataMiningController {
     @PostMapping("/api/classification")
     public Map<String, Object> classification(@RequestBody Map<String, Object> body) {
         Map<String, Object> payload = new HashMap<>();
-        payload.put("rows", dataService.getIrisRows());
+        payload.put("rows", dataService.getClassificationIrisRows());
         payload.put("max_depth", (int) number(body, "max_depth", 3));
         payload.put("min_leaf", (int) number(body, "min_leaf", 2));
         return algorithmService.run("classification", payload);
@@ -112,9 +128,14 @@ public class DataMiningController {
     @PostMapping("/api/regression")
     public Map<String, Object> regression(@RequestBody Map<String, Object> body) {
         Map<String, Object> payload = new HashMap<>();
-        payload.put("rows", dataService.getIrisRows());
-        payload.put("x_field", string(body, "x_field", "petal_length"));
-        payload.put("y_field", string(body, "y_field", "petal_width"));
+        Object rows = body.get("rows");
+        if (rows instanceof List) {
+            payload.put("rows", rows);
+        } else {
+            payload.put("rows", dataService.getRegressionRows());
+        }
+        payload.put("x_field", string(body, "x_field", "x"));
+        payload.put("y_field", string(body, "y_field", "y"));
         return algorithmService.run("regression", payload);
     }
 

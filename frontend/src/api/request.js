@@ -9,8 +9,8 @@ export function fetchHealth() {
   return request.get('/api/health')
 }
 
-export function fetchIris() {
-  return request.get('/api/iris')
+export function fetchIris(dataset = 'default') {
+  return request.get('/api/iris', { params: { dataset } })
 }
 
 export function uploadIris(file) {
@@ -27,6 +27,12 @@ export function uploadTransactions(file) {
   const form = new FormData()
   form.append('file', file)
   return request.post('/api/transactions/upload', form)
+}
+
+export function uploadRegression(file) {
+  const form = new FormData()
+  form.append('file', file)
+  return request.post('/api/regression/upload', form)
 }
 
 export function runAssociation(minSupport, minConfidence) {
@@ -47,9 +53,11 @@ export function runClassification(maxDepth, minLeaf) {
   })
 }
 
-export function runRegression(xField, yField) {
-  return request.post('/api/regression', {
+export function runRegression(xField = 'x', yField = 'y', rows = null) {
+  const body = {
     x_field: xField,
     y_field: yField,
-  })
+  }
+  if (Array.isArray(rows)) body.rows = rows
+  return request.post('/api/regression', body)
 }

@@ -2,7 +2,7 @@
   <section class="page">
     <div class="page-title">
       <strong>分类分析</strong>
-      <span>决策树分类</span>
+      <span>CART 决策树分类</span>
     </div>
 
     <el-card shadow="never" class="toolbar-card">
@@ -20,7 +20,7 @@
           <el-input-number v-model="minLeaf" :min="1" :max="10" />
         </el-form-item>
         <el-form-item>
-          <el-button type="success" @click="analyze">决策树分类</el-button>
+          <el-button type="success" @click="analyze">CART 分类</el-button>
         </el-form-item>
       </el-form>
     </el-card>
@@ -30,8 +30,11 @@
       <el-card shadow="never" class="work-card">
         <template #header>
           <div class="card-header">
-            <strong>决策树图</strong>
+            <strong>决策树图（CART）</strong>
             <el-tag type="success">准确率 {{ accuracyText }}</el-tag>
+            <el-tag>Precision {{ precisionText }}</el-tag>
+            <el-tag>Recall {{ recallText }}</el-tag>
+            <el-tag>F1 {{ f1Text }}</el-tag>
           </div>
         </template>
         <div class="tree-scroll">
@@ -50,9 +53,12 @@ import { fetchIris, runClassification, uploadIris } from '../api/request'
 import DataTable from './components/DataTable.vue'
 
 const rows = ref([])
-const maxDepth = ref(3)
+const maxDepth = ref(4)
 const minLeaf = ref(2)
 const accuracyText = ref('-')
+const precisionText = ref('-')
+const recallText = ref('-')
+const f1Text = ref('-')
 const chartRef = ref(null)
 let chart = null
 
@@ -141,7 +147,7 @@ function renderTree(tree) {
 }
 
 async function loadData() {
-  const response = await fetchIris()
+  const response = await fetchIris('classification')
   rows.value = response.data.rows
   ElMessage.success('默认数据已载入')
 }
@@ -157,6 +163,9 @@ async function analyze() {
   const response = await runClassification(maxDepth.value, minLeaf.value)
   rows.value = response.data.rows
   accuracyText.value = `${Math.round(response.data.accuracy * 100)}%`
+  precisionText.value = Number(response.data.precision || 0).toFixed(3)
+  recallText.value = Number(response.data.recall || 0).toFixed(3)
+  f1Text.value = Number(response.data.f1 || 0).toFixed(3)
   await nextTick()
   renderTree(response.data.tree)
   ElMessage.success('分类分析完成')
