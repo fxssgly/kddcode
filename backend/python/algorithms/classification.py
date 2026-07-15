@@ -29,10 +29,36 @@ def majority(rows):
     return max(counts, key=counts.get) if counts else "unknown"
 
 
-def build_tree(rows, depth, max_depth, min_leaf):
+def class_counts(rows, class_names):
+    counts = {}
+    for row in rows:
+        species = row.get("species", "unknown")
+        counts[species] = counts.get(species, 0) + 1
+    return [counts.get(name, 0) for name in class_names]
+
+
+def node_impurity(rows):
+    return gini([rows])
+
+
+def node_payload(rows, class_names, name, depth, criterion="gini"):
+    counts = class_counts(rows, class_names)
+    class_name = majority(rows)
+    return {
+        "name": name,
+        "criterion": criterion,
+        "impurity": round(node_impurity(rows), 3),
+        "samples": len(rows),
+        "value": counts,
+        "className": class_name,
+        "depth": depth,
+    }
+
+
+def build_tree(rows, depth, max_depth, min_leaf, class_names):
     labels = set(row.get("species", "unknown") for row in rows)
     if depth >= max_depth or len(rows) <= min_leaf or len(labels) == 1:
-        return {"name": majority(rows), "value": len(rows)}
+        return node_payload(rows, class_names, majority(rows), depth)
 
     best = None
     for feature in FEATURES:
@@ -53,16 +79,19 @@ def build_tree(rows, depth, max_depth, min_leaf):
                 }
 
     if best is None:
-        return {"name": majority(rows), "value": len(rows)}
+        return node_payload(rows, class_names, majority(rows), depth)
 
     name = "%s <= %.2f" % (best["feature"], best["threshold"])
-    return {
-        "name": name,
+    node = node_payload(rows, class_names, name, depth)
+    node.update({
+        "feature": best["feature"],
+        "threshold": round(best["threshold"], 3),
         "children": [
-            build_tree(best["left"], depth + 1, max_depth, min_leaf),
-            build_tree(best["right"], depth + 1, max_depth, min_leaf),
+            build_tree(best["left"], depth + 1, max_depth, min_leaf, class_names),
+            build_tree(best["right"], depth + 1, max_depth, min_leaf, class_names),
         ],
-    }
+    })
+    return node
 
 
 def predict_tree(node, row):
@@ -154,7 +183,8 @@ def classification(payload):
     max_depth = int(as_float(payload.get("max_depth"), 3))
     min_leaf = int(as_float(payload.get("min_leaf"), 2))
     train_rows, test_rows = train_test_split_rows(rows)
-    tree = build_tree(train_rows, 0, max_depth, min_leaf)
+    class_names = sorted(set(row.get("species", "unknown") for row in rows))
+    tree = build_tree(train_rows, 0, max_depth, min_leaf, class_names)
     for row in rows:
         predicted = predict_tree(tree, row)
         row["predicted"] = predicted

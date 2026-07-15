@@ -62,16 +62,40 @@ const f1Text = ref('-')
 const chartRef = ref(null)
 let chart = null
 
-function formatNodeName(name) {
-  return String(name || '').replace(' <= ', '\n<= ')
+const classPalette = {
+  setosa: [252, 186, 122],
+  versicolor: [119, 191, 229],
+  virginica: [225, 146, 231],
+  unknown: [190, 210, 205],
 }
 
-function nodeColor(name, isLeaf) {
-  if (!isLeaf) return '#ffffff'
-  if (name === 'setosa') return '#f59e42'
-  if (name === 'versicolor') return '#38a9e6'
-  if (name === 'virginica') return '#d946ef'
-  return '#a7f3d0'
+function classColor(className) {
+  return classPalette[className] || classPalette.unknown
+}
+
+function blendedNodeColor(node) {
+  const base = classColor(node.className || node.name)
+  const values = Array.isArray(node.value) ? node.value : []
+  const samples = Number(node.samples || values.reduce((sum, item) => sum + Number(item || 0), 0) || 1)
+  const maxCount = values.length ? Math.max(...values.map((item) => Number(item || 0))) : samples
+  const purity = samples ? maxCount / samples : 0
+  const mix = 0.18 + purity * 0.5
+  const rgb = base.map((channel) => Math.round(255 - (255 - channel) * mix))
+  return `rgb(${rgb[0]}, ${rgb[1]}, ${rgb[2]})`
+}
+
+function formatRule(name) {
+  return String(name || '').replace(' <= ', ' <= ')
+}
+
+function buildNodeLabel(node) {
+  const rule = node.children && node.children.length ? formatRule(node.name) : `class = ${node.className || node.name}`
+  const criterion = node.criterion || 'gini'
+  const impurity = Number(node.impurity || 0).toFixed(3)
+  const samples = Number(node.samples || 0)
+  const value = Array.isArray(node.value) ? `[${node.value.join(', ')}]` : `[${node.value || 0}]`
+  const className = node.className || node.name || 'unknown'
+  return `${rule}\n${criterion}=${impurity}\nsamples=${samples}\nvalue=${value}\nclass=${className}`
 }
 
 function decorateTree(node) {
@@ -79,62 +103,86 @@ function decorateTree(node) {
   const isLeaf = children.length === 0
   return {
     ...node,
-    name: formatNodeName(node.name),
+    name: buildNodeLabel(node),
     children,
     itemStyle: {
-      color: nodeColor(node.name, isLeaf),
-      borderColor: '#9ca3af',
-      borderWidth: 1.4,
+      color: blendedNodeColor(node),
+      borderColor: isLeaf ? '#8b8f98' : '#7f8794',
+      borderWidth: 1.2,
     },
     label: {
-      color: isLeaf ? '#111827' : '#374151',
-      fontSize: 12,
+      color: '#111827',
+      fontSize: 9,
       fontWeight: isLeaf ? 600 : 500,
     },
   }
 }
 
+function treeStats(node, depth = 0) {
+  const children = node.children || []
+  if (!children.length) {
+    return { depth, leaves: 1 }
+  }
+  return children.reduce((stats, child) => {
+    const childStats = treeStats(child, depth + 1)
+    return {
+      depth: Math.max(stats.depth, childStats.depth),
+      leaves: stats.leaves + childStats.leaves,
+    }
+  }, { depth, leaves: 0 })
+}
+
 function renderTree(tree) {
   if (!chartRef.value || !tree) return
+  const stats = treeStats(tree)
+  const chartWidth = Math.max(1180, stats.leaves * 240)
+  const chartHeight = Math.max(780, (stats.depth + 1) * 180)
+  chartRef.value.style.width = `${chartWidth}px`
+  chartRef.value.style.height = `${chartHeight}px`
+
   if (!chart) chart = echarts.init(chartRef.value)
   chart.clear()
+  chart.resize()
   chart.setOption({
-    tooltip: { trigger: 'item' },
+    tooltip: {
+      trigger: 'item',
+      formatter: (params) => String(params.name || '').replace(/\n/g, '<br/>'),
+    },
     series: [{
       type: 'tree',
       orient: 'vertical',
       data: [decorateTree(tree)],
       top: '8%',
-      left: '3%',
+      left: '6%',
       bottom: '10%',
-      right: '3%',
+      right: '6%',
       symbol: 'rect',
-      symbolSize: [136, 48],
+      symbolSize: [138, 78],
       edgeShape: 'polyline',
       edgeForkPosition: '50%',
       initialTreeDepth: -1,
       roam: true,
       scaleLimit: {
-        min: 0.7,
-        max: 1.8,
+        min: 0.45,
+        max: 2.2,
       },
       label: {
         position: 'inside',
         verticalAlign: 'middle',
         align: 'center',
-        lineHeight: 17,
+        lineHeight: 12,
       },
       leaves: {
         label: {
           position: 'inside',
           verticalAlign: 'middle',
           align: 'center',
-          lineHeight: 17,
+          lineHeight: 12,
         },
       },
       lineStyle: {
-        color: '#9ca3af',
-        width: 1.2,
+        color: '#8f96a3',
+        width: 1,
       },
       emphasis: {
         focus: 'descendant',
@@ -190,14 +238,18 @@ onMounted(async () => {
 
 .tree-scroll {
   width: 100%;
+  display: flex;
+  justify-content: center;
   overflow-x: auto;
-  overflow-y: hidden;
-  padding-bottom: 6px;
+  overflow-y: auto;
+  max-height: 78vh;
+  padding: 0 18px 10px;
 }
 
 .tree-chart {
-  width: 100%;
-  min-width: 980px;
-  height: 620px;
+  flex: 0 0 auto;
+  width: 1180px;
+  min-width: 1180px;
+  height: 780px;
 }
 </style>
