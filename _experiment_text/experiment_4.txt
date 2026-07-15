@@ -1,0 +1,16 @@
+实验四
+实验项目3：回归模型    实验类型（验证/设计/创新）：设计    学时：4
+实验要求：
+1.掌握Python中的数据的表示；
+2.掌握Python外部工具包的调用方式；
+3.掌握线性回归算法的特点，噪声的影响和应用场景。
+重点难点：
+【本实验重点】线性回归算法工具包的使用。
+实验内容：
+调试并理解回归示例的源代码实现regression.py。掌握其中的datasets.make_regression函数和np.random.normal函数。并生成500个1维的回归数据，以及100个噪声点，作为数据集。
+参考：https://scikit-learn.org/stable/auto_examples/linear_model/plot_ransac.html#sphx-glr-auto-examples-linear-model-plot-ransac-py
+使用train_test_split函数将数据集划分为训练集和测试集（8:2），使用一元线性回归和一元二次多项式回归对数据进行拟合。
+参考：https://blog.csdn.net/SA14023053/article/details/51703204
+使用sklearn.metrics模块中的r2_score函数计算R方确定系数。
+将测试样本和回归曲线进行可视化。
+在测试集上分别测试一元线性回归和一元二次多项式回归，并使用sklearn.metrics的mean_squared_error函数计算预测值和实际值之间的平均平方误差MSE。
