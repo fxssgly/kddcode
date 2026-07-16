@@ -7,7 +7,7 @@
       </div>
     </template>
 
-    <el-table :data="rows.slice(0, 20)" height="360" border size="small">
+    <el-table :data="rows" height="360" border size="small">
       <el-table-column
         v-for="column in columns"
         :key="column.prop"
