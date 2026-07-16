@@ -28,14 +28,12 @@ public class DatasetController {
     }
 
     @GetMapping({"/api/iris", "/api/datasets/iris"})
-    public Map<String, Object> iris(@RequestParam(value = "dataset", defaultValue = "default") String dataset) {
+    public Map<String, Object> iris(@RequestParam(value = "dataset", defaultValue = "clustering") String dataset) {
         List<Map<String, Object>> rows;
-        if ("clustering".equalsIgnoreCase(dataset)) {
-            rows = datasetService.getClusteringIrisRows();
-        } else if ("classification".equalsIgnoreCase(dataset)) {
+        if ("classification".equalsIgnoreCase(dataset)) {
             rows = datasetService.getClassificationIrisRows();
         } else {
-            rows = datasetService.getIrisRows();
+            rows = datasetService.getClusteringIrisRows();
         }
         Map<String, Object> result = new HashMap<>();
         result.put("total", rows.size());

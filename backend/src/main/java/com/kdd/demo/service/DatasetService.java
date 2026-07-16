@@ -41,10 +41,6 @@ public class DatasetService {
         this.useMysql = useMysql;
     }
 
-    public List<Map<String, Object>> getIrisRows() {
-        return getIrisRows(Paths.get("data", "iris_sample.csv"));
-    }
-
     public List<Map<String, Object>> getClusteringIrisRows() {
         return getIrisRows(Paths.get("data", "iris.csv"));
     }

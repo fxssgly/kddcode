@@ -9,7 +9,7 @@ export function fetchHealth() {
   return request.get('/api/health')
 }
 
-export function fetchIris(dataset = 'default') {
+export function fetchIris(dataset = 'clustering') {
   return request.get('/api/iris', { params: { dataset } })
 }
 
