@@ -38,7 +38,7 @@
 </template>
 
 <script setup>
-import { nextTick, onMounted, ref } from 'vue'
+import { nextTick, ref } from 'vue'
 import * as echarts from 'echarts'
 import { ElMessage } from 'element-plus'
 import { fetchIris, runClustering, uploadIris } from '../api/request'
@@ -171,6 +171,10 @@ async function handleUpload(file) {
 }
 
 async function analyze() {
+  if (!rows.value.length) {
+    ElMessage.warning('请先载入数据')
+    return
+  }
   const response = await runClustering(k.value)
   rows.value = response.data.rows
   centers.value = response.data.centers || []
@@ -178,8 +182,6 @@ async function analyze() {
   renderChart()
   ElMessage.success('聚类分析完成')
 }
-
-onMounted(loadData)
 </script>
 
 <style scoped>

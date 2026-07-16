@@ -73,7 +73,7 @@
 </template>
 
 <script setup>
-import { computed, nextTick, onMounted, ref } from 'vue'
+import { computed, nextTick, ref } from 'vue'
 import * as echarts from 'echarts'
 import { ElMessage } from 'element-plus'
 import { fetchTransactions, runAssociation, uploadTransactions } from '../api/request'
@@ -208,21 +208,32 @@ function metricName() {
   return '支持度'
 }
 
+function clearAnalysis() {
+  rules.value = []
+  frequentPairs.value = []
+  if (chart) chart.clear()
+}
+
 async function loadData() {
   const response = await fetchTransactions()
   transactions.value = response.data.transactions
-  await analyze()
+  clearAnalysis()
+  ElMessage.success('默认数据已载入')
 }
 
 async function handleUpload(file) {
   const response = await uploadTransactions(file)
   transactions.value = response.data.transactions
-  await analyze()
+  clearAnalysis()
   ElMessage.success('CSV 已上传')
   return false
 }
 
 async function analyze() {
+  if (!transactions.value.length) {
+    ElMessage.warning('请先载入数据')
+    return
+  }
   const response = await runAssociation(minSupport.value, minConfidence.value)
   transactions.value = response.data.transactions
   rules.value = response.data.rules
@@ -231,8 +242,6 @@ async function analyze() {
   renderChart()
   ElMessage.success('关联规则分析完成')
 }
-
-onMounted(loadData)
 </script>
 
 <style scoped>

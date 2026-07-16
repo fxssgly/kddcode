@@ -85,7 +85,7 @@
 </template>
 
 <script setup>
-import { computed, nextTick, onMounted, ref } from 'vue'
+import { computed, nextTick, ref } from 'vue'
 import * as echarts from 'echarts'
 import { ElMessage } from 'element-plus'
 import { Refresh } from '@element-plus/icons-vue'
@@ -285,8 +285,6 @@ async function startRegression() {
   }
   await analyzeRows(rows, '回归分析完成')
 }
-
-onMounted(loadData)
 </script>
 
 <style scoped>

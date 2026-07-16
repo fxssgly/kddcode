@@ -46,7 +46,7 @@
 </template>
 
 <script setup>
-import { nextTick, onMounted, ref } from 'vue'
+import { nextTick, ref } from 'vue'
 import * as echarts from 'echarts'
 import { ElMessage } from 'element-plus'
 import { fetchIris, runClassification, uploadIris } from '../api/request'
@@ -194,20 +194,34 @@ function renderTree(tree) {
   chart.resize()
 }
 
+function clearTree() {
+  if (chart) chart.clear()
+  accuracyText.value = '-'
+  precisionText.value = '-'
+  recallText.value = '-'
+  f1Text.value = '-'
+}
+
 async function loadData() {
   const response = await fetchIris('classification')
   rows.value = response.data.rows
+  clearTree()
   ElMessage.success('默认数据已载入')
 }
 
 async function handleUpload(file) {
   const response = await uploadIris(file)
   rows.value = response.data.rows
+  clearTree()
   ElMessage.success('CSV 已上传')
   return false
 }
 
 async function analyze() {
+  if (!rows.value.length) {
+    ElMessage.warning('请先载入数据')
+    return
+  }
   const response = await runClassification(maxDepth.value, minLeaf.value)
   rows.value = response.data.rows
   accuracyText.value = `${Math.round(response.data.accuracy * 100)}%`
@@ -218,11 +232,6 @@ async function analyze() {
   renderTree(response.data.tree)
   ElMessage.success('分类分析完成')
 }
-
-onMounted(async () => {
-  await loadData()
-  await analyze()
-})
 </script>
 
 <style scoped>
