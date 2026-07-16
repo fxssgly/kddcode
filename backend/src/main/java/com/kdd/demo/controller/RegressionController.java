@@ -1,5 +1,10 @@
 package com.kdd.demo.controller;
 
+/**
+ * 文件作用：暴露“回归分析”的 HTTP 接口。
+ * 项目位置：Controller 层，对应前端 RegressionView.vue 的开始回归操作。
+ * 交互关系：把 x/y 字段和可选 rows 交给 AlgorithmService，再由 Python 算法计算线性、多项式和 RANSAC 回归。
+ */
 import com.kdd.demo.service.AlgorithmService;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.PostMapping;

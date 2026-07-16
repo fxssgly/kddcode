@@ -1,3 +1,8 @@
+<!--
+  文件作用：CART 决策树分类实验页面，展示预测结果、评估指标和树形图。
+  项目位置：前端 views 层，对应后端 ClassificationController。
+  交互关系：把树深和叶子样本数提交给后端，后端返回树结构后由 ECharts tree 系列绘制。
+-->
 <template>
   <section class="page">
     <div class="page-title">

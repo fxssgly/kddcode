@@ -1,5 +1,10 @@
 package com.kdd.demo.controller;
 
+/**
+ * 文件作用：提供后端根路径和健康检查接口。
+ * 项目位置：Controller 层，用于确认 Spring Boot 服务已经启动并可被前端访问。
+ * 交互关系：不依赖数据库或算法模块，适合部署或调试时快速判断后端是否在线。
+ */
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;

@@ -1,3 +1,8 @@
+<!--
+  文件作用：登录/注册页面。
+  项目位置：前端 views 层，是用户进入系统前看到的第一个页面。
+  交互关系：调用 api/request.js 中的登录注册接口；成功登录后通过 auth.js 保存状态，并跳转到实验页面。
+-->
 <template>
   <main class="login-page">
     <el-card class="login-card" shadow="always">

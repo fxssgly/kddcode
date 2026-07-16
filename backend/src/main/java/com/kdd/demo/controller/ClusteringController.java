@@ -1,5 +1,10 @@
 package com.kdd.demo.controller;
 
+/**
+ * 文件作用：暴露“K-Means 聚类分析”的 HTTP 接口。
+ * 项目位置：Controller 层，对应前端 ClusteringView.vue 的聚类分析操作。
+ * 交互关系：把聚类个数 k 传给 AlgorithmService；后者读取 Iris 数据并调用 Python，必要时由 Java 兜底实现聚类。
+ */
 import com.kdd.demo.service.AlgorithmService;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.PostMapping;

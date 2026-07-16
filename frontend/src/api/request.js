@@ -1,3 +1,7 @@
+// 文件作用：集中封装前端访问后端的所有 HTTP 请求。
+// 项目位置：前端 API 层，页面组件不直接写 URL 细节，而是调用这里的函数。
+// 交互关系：Axios 把请求发给 Spring Boot；返回的数据再交给各个 Vue 页面渲染表格和图表。
+
 import axios from 'axios'
 
 // 统一的 Axios 实例。baseURL 为空时，请求会走当前前端开发服务器；

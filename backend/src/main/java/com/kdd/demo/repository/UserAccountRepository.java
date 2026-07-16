@@ -1,5 +1,10 @@
 package com.kdd.demo.repository;
 
+/**
+ * 文件作用：UserAccount 的数据库访问接口。
+ * 项目位置：Repository 层，负责 users 表的查询、保存和用户名去重检查。
+ * 交互关系：AuthService 调用这里的方法完成注册和登录；Spring Data 会根据方法名自动生成 SQL。
+ */
 import com.kdd.demo.entity.UserAccount;
 import org.springframework.data.jpa.repository.JpaRepository;
 

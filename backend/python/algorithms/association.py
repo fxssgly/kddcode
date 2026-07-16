@@ -1,4 +1,9 @@
 # -*- coding: utf-8 -*-
+"""文件作用：实现关联规则挖掘算法。
+
+项目位置：backend/python/algorithms 算法模块之一，由 kdd_algorithms.py 根据 association 操作调用。
+交互关系：输入来自 Java 传入的事务篮子和阈值，输出频繁项集、二项指标和规则列表给前端热力图/表格使用。
+"""
 import itertools
 
 from algorithms.common import as_float, as_text

@@ -1,3 +1,8 @@
+<!--
+  文件作用：通用数据表组件。
+  项目位置：前端 components 层，被聚类和分类页面复用。
+  交互关系：父页面把 rows 和显示开关传进来，本组件根据实际字段动态生成 Element Plus 表格列。
+-->
 <template>
   <el-card shadow="never" class="work-card">
     <template #header>

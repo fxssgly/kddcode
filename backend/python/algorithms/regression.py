@@ -1,4 +1,9 @@
 # -*- coding: utf-8 -*-
+"""文件作用：实现线性回归、二次多项式回归和 RANSAC 稳健回归。
+
+项目位置：backend/python/algorithms 算法模块之一，对应前端“回归分析”页面。
+交互关系：接收前端载入的 x/y 数据，返回每个样本的预测值、模型公式和测试集指标。
+"""
 import random
 
 from algorithms.common import as_float

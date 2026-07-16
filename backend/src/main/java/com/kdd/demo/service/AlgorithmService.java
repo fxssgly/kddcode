@@ -1,5 +1,10 @@
 package com.kdd.demo.service;
 
+/**
+ * 文件作用：算法请求编排层，负责把控制器请求转换成 Python 算法需要的 payload。
+ * 项目位置：Service 层，夹在 Controller 和 PythonAlgorithmService/DatasetService 之间。
+ * 交互关系：先从 DatasetService 拿数据，再调用 PythonAlgorithmService.run；相当于“准备食材并下单给算法厨房”。
+ */
 import org.springframework.stereotype.Service;
 
 import java.util.HashMap;

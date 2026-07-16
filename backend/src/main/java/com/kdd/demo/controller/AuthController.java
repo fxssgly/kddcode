@@ -1,5 +1,10 @@
 package com.kdd.demo.controller;
 
+/**
+ * 文件作用：提供注册和登录接口。
+ * 项目位置：Controller 层，是前端 LoginView.vue 和后端认证服务之间的入口。
+ * 交互关系：收到账号密码后调用 AuthService；AuthService 负责校验、加密、访问 UserAccountRepository。
+ */
 import com.kdd.demo.service.AuthService;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.CrossOrigin;

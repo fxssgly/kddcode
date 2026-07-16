@@ -1,3 +1,7 @@
+// 文件作用：定义前端页面路由和登录拦截规则。
+// 项目位置：Vue Router 配置层，负责 URL 和页面组件之间的对应关系。
+// 交互关系：读取 auth.js 的登录状态；未登录用户会被导回 LoginView，登录后才能进入实验页面。
+
 import { createRouter, createWebHistory } from 'vue-router'
 import LoginView from '../views/LoginView.vue'
 import AssociationView from '../views/AssociationView.vue'

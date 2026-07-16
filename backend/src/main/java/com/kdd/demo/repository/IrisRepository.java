@@ -1,5 +1,10 @@
 package com.kdd.demo.repository;
 
+/**
+ * 文件作用：IrisSample 的数据库访问接口。
+ * 项目位置：Repository 层，由 Spring Data JPA 自动实现，不需要手写 SQL。
+ * 交互关系：DatasetService 在启用 MySQL 时调用 findAll，把数据库中的 Iris 样本读出来。
+ */
 import com.kdd.demo.entity.IrisSample;
 import org.springframework.data.jpa.repository.JpaRepository;
 

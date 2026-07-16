@@ -1,5 +1,10 @@
 package com.kdd.demo.entity;
 
+/**
+ * 文件作用：描述 transaction_items 表中的一个商品项。
+ * 项目位置：Entity 层，表示“一笔交易中的一个商品”，多行会组合成一笔完整交易。
+ * 交互关系：TransactionItemRepository 读取这些行，DatasetService 按 transactionId 分组成关联规则算法需要的篮子数据。
+ */
 import javax.persistence.Column;
 import javax.persistence.Entity;
 import javax.persistence.Id;

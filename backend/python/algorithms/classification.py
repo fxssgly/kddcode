@@ -1,4 +1,9 @@
 # -*- coding: utf-8 -*-
+"""文件作用：实现 CART 风格决策树分类。
+
+项目位置：backend/python/algorithms 算法模块之一，对应前端“分类分析”页面。
+交互关系：接收 DatasetService 准备的 Iris 行数据，返回带预测标签的数据、树结构和评估指标。
+"""
 
 from algorithms.common import FEATURES, as_float, as_text
 

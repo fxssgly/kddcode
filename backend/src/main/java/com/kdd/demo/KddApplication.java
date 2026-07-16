@@ -1,5 +1,11 @@
 package com.kdd.demo;
 
+/**
+ * 文件作用：Spring Boot 后端应用入口。
+ * 项目位置：位于 backend/src/main/java 的根包中，是整个 Java 后端启动时最先执行的类。
+ * 交互关系：启动后 Spring 会扫描 controller、service、repository、entity 等组件；
+ * 前端请求先进入 controller，再经过 service 读取 CSV/MySQL 或调用 Python 算法。
+ */
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 

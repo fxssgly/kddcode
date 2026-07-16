@@ -1,4 +1,9 @@
 # -*- coding: utf-8 -*-
+"""文件作用：Python 算法总入口。
+
+项目位置：backend/python 下的命令行脚本，由 Java 的 PythonAlgorithmService 启动。
+交互关系：读取 Java 写入的 JSON 请求，根据 operation 分发到 algorithms 包中的具体算法，再把结果 JSON 输出给 Java。
+"""
 import json
 import sys
 

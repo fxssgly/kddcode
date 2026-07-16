@@ -1,3 +1,8 @@
+<!--
+  文件作用：回归分析实验页面，展示固定数据集、模型指标和三种回归曲线。
+  项目位置：前端 views 层，对应后端 RegressionController 和静态 CSV 数据。
+  交互关系：先读取 public/data 下的 CSV，再把 rows 发送给后端算法，最后用 ECharts 展示预测曲线。
+-->
 <template>
   <section class="page regression-page">
     <div class="page-title">

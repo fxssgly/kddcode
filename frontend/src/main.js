@@ -1,3 +1,7 @@
+// 文件作用：创建并挂载 Vue 前端应用。
+// 项目位置：前端入口文件，浏览器加载 index.html 后会从这里启动整个单页应用。
+// 交互关系：挂载 Element Plus 组件库和 Vue Router；路由再决定显示登录页或各个实验页面。
+
 import { createApp } from 'vue'
 import ElementPlus from 'element-plus'
 import 'element-plus/dist/index.css'

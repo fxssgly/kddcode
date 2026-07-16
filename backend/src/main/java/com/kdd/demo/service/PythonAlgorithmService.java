@@ -1,5 +1,10 @@
 package com.kdd.demo.service;
 
+/**
+ * 文件作用：Java 后端调用 Python 算法脚本的桥梁。
+ * 项目位置：Service 层，位于 Java 世界和 backend/python 算法世界的交界处。
+ * 交互关系：把 Java Map 写成临时 JSON 文件，启动 kdd_algorithms.py，读取 Python 输出的 JSON 再返回给控制器。
+ */
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;

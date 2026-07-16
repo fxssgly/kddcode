@@ -1,3 +1,8 @@
+<!--
+  文件作用：K-Means 聚类实验页面，展示 Iris 数据表和 PCA 散点图。
+  项目位置：前端 views 层，对应后端 ClusteringController 和 DatasetController。
+  交互关系：前端负责参数、表格和图表；后端负责读取数据并执行聚类算法。
+-->
 <template>
   <section class="page">
     <div class="page-title">

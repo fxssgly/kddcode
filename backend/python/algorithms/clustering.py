@@ -1,4 +1,9 @@
 # -*- coding: utf-8 -*-
+"""文件作用：实现 K-Means 聚类和 PCA 可视化坐标计算。
+
+项目位置：backend/python/algorithms 算法模块之一，对应前端“聚类分析”页面。
+交互关系：接收 Iris 数值特征和 k 值，返回 cluster 标签以及二维中心点坐标。
+"""
 import math
 
 from algorithms.common import FEATURES, as_float

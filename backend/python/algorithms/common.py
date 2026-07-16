@@ -1,4 +1,9 @@
 # -*- coding: utf-8 -*-
+"""文件作用：提供多个 Python 算法共享的小工具。
+
+项目位置：backend/python/algorithms 公共模块，不直接被前端调用。
+交互关系：关联、聚类、分类、回归模块都会复用这里的字段列表和类型转换函数。
+"""
 
 FEATURES = ["sepal_length", "sepal_width", "petal_length", "petal_width"]
 

@@ -1,5 +1,10 @@
 package com.kdd.demo.entity;
 
+/**
+ * 文件作用：描述 users 表中的系统用户账号。
+ * 项目位置：Entity 层，服务于登录注册功能。
+ * 交互关系：AuthService 通过 UserAccountRepository 保存和查询本实体，前端只会拿到安全裁剪后的 id 和 username。
+ */
 import javax.persistence.Column;
 import javax.persistence.Entity;
 import javax.persistence.GeneratedValue;

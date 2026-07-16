@@ -1,3 +1,7 @@
+-- 文件作用：初始化 KDD 实验系统使用的 MySQL 数据库表和样例数据。
+-- 项目位置：backend/database，部署或课堂演示前手动执行。
+-- 交互关系：Spring Boot 的 Repository 会读取这里创建的 users、iris、transaction_items 等表；如果未启用 MySQL，系统会回退到 CSV。
+
 -- 初始化 KDD 演示用 MySQL 数据库。
 -- 该脚本会重建演示表，并写入 Iris、事务篮子和回归样例数据。
 

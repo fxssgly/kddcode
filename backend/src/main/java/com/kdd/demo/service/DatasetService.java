@@ -1,5 +1,10 @@
 package com.kdd.demo.service;
 
+/**
+ * 文件作用：统一管理实验数据来源，包括内置 CSV、上传 CSV 和可选 MySQL。
+ * 项目位置：Service 层，是所有数据集接口和算法服务共同依赖的数据入口。
+ * 交互关系：DatasetController 用它返回表格数据；AlgorithmService 用它把数据送进 Python 算法。
+ */
 import com.kdd.demo.entity.IrisSample;
 import com.kdd.demo.entity.TransactionItem;
 import com.kdd.demo.repository.IrisRepository;

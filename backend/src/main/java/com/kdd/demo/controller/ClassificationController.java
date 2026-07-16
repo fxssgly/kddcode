@@ -1,5 +1,10 @@
 package com.kdd.demo.controller;
 
+/**
+ * 文件作用：暴露“决策树分类分析”的 HTTP 接口。
+ * 项目位置：Controller 层，对应前端 ClassificationView.vue 的 CART 分类按钮。
+ * 交互关系：接收 max_depth、min_leaf 等参数，然后交给 AlgorithmService 组织 Iris 数据并调用 Python 分类算法。
+ */
 import com.kdd.demo.service.AlgorithmService;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.PostMapping;

@@ -1,5 +1,10 @@
 package com.kdd.demo.controller;
 
+/**
+ * 文件作用：暴露“关联规则分析”的 HTTP 接口。
+ * 项目位置：Controller 层，直接接收 Vue 前端通过 Axios 发来的 /api/association 请求。
+ * 交互关系：本类不做算法计算，只把请求参数交给 AlgorithmService；AlgorithmService 再读取事务数据并调用 Python。
+ */
 import com.kdd.demo.service.AlgorithmService;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.PostMapping;

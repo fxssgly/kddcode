@@ -1,3 +1,7 @@
+// 文件作用：封装浏览器本地登录态的读取、保存和清除。
+// 项目位置：前端认证辅助模块，被登录页、路由守卫和退出登录按钮共同使用。
+// 交互关系：LoginView 登录成功后写入 localStorage；router/index.js 根据这里的状态决定是否允许进入实验页。
+
 const LOGGED_IN_KEY = 'kdd_logged_in'
 const CURRENT_USER_KEY = 'kdd_current_user'
 const CURRENT_USER_ID_KEY = 'kdd_current_user_id'

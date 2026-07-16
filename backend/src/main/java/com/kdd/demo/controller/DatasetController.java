@@ -1,5 +1,10 @@
 package com.kdd.demo.controller;
 
+/**
+ * 文件作用：提供数据集读取和 CSV 上传接口。
+ * 项目位置：Controller 层，是前端“载入数据/上传 CSV”按钮访问后端数据的统一入口。
+ * 交互关系：具体解析 CSV、读取 MySQL、保存上传数据的工作都交给 DatasetService，控制器只负责把结果包装成 JSON。
+ */
 import com.kdd.demo.service.DatasetService;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;

@@ -1,5 +1,10 @@
 package com.kdd.demo.service;
 
+/**
+ * 文件作用：处理注册、登录、密码哈希和密码校验。
+ * 项目位置：Service 层，是 AuthController 和 UserAccountRepository 之间的业务逻辑层。
+ * 交互关系：Controller 传入账号密码，本类完成校验和加密后通过 Repository 访问 users 表。
+ */
 import com.kdd.demo.entity.UserAccount;
 import com.kdd.demo.repository.UserAccountRepository;
 import org.springframework.stereotype.Service;

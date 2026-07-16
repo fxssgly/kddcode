@@ -1,5 +1,10 @@
 package com.kdd.demo.entity;
 
+/**
+ * 文件作用：描述 MySQL iris 表中的一条 Iris 花样本。
+ * 项目位置：Entity 层，供 Spring Data JPA 把数据库行映射成 Java 对象。
+ * 交互关系：IrisRepository 读取本实体，DatasetService 再把它转换成前端和 Python 都能理解的 JSON 字段。
+ */
 import javax.persistence.Column;
 import javax.persistence.Entity;
 import javax.persistence.Id;

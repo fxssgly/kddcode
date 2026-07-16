@@ -1,3 +1,8 @@
+<!--
+  文件作用：关联规则实验页面，展示事务数据、参数控件、规则表和热力图。
+  项目位置：前端 views 层，对应后端 AssociationController 和 DatasetController。
+  交互关系：载入/上传数据走数据集接口，点击分析走 /api/association，结果用 ECharts 渲染。
+-->
 <template>
   <section class="page">
     <div class="page-title">
