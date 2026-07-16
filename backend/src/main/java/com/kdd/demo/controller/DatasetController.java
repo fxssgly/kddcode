@@ -61,6 +61,15 @@ public class DatasetController {
         return result;
     }
 
+    @GetMapping({"/api/regression/data", "/api/datasets/regression"})
+    public Map<String, Object> regression() {
+        List<Map<String, Object>> rows = datasetService.getRegressionRows();
+        Map<String, Object> result = new HashMap<>();
+        result.put("total", rows.size());
+        result.put("rows", rows);
+        return result;
+    }
+
     @GetMapping({"/api/transactions", "/api/datasets/transactions"})
     public Map<String, Object> transactions() {
         List<List<String>> transactions = datasetService.getTransactions();

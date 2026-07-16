@@ -1,3 +1,10 @@
+# Only track the backend and frontend project folders at the repo root.
+/*
+!/.gitignore
+!/backend/
+!/frontend/
+/non_code_files/
+
 backend/.venv/
 backend/__pycache__/
 backend/services/__pycache__/
@@ -8,6 +15,7 @@ backend/target/
 frontend/node_modules/
 frontend/dist/
 frontend/.npm-cache/
+frontend/public/data/
 .idea/
 存档/
 实验/

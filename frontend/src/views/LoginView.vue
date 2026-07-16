@@ -3,7 +3,6 @@
     <el-card class="login-card" shadow="always">
       <p class="eyebrow">KDD System</p>
       <h1>数据挖掘与分析系统</h1>
-      <p class="description">默认账号：admin，默认密码：123456。</p>
 
       <el-segmented v-model="mode" :options="modeOptions" class="login-switch" />
 

@@ -2,16 +2,14 @@
   <section class="page regression-page">
     <div class="page-title">
       <strong>回归分析</strong>
-      <span>实验四固定数据集</span>
+      <span>固定数据集</span>
     </div>
 
     <el-card shadow="never" class="toolbar-card">
       <el-form inline label-width="92px">
         <el-form-item label="数据集">
-          <el-button type="primary" :icon="Refresh" :loading="loading" @click="analyzeDefault">载入默认数据</el-button>
-          <el-upload :show-file-list="false" accept=".csv" :before-upload="handleUpload">
-            <el-button :icon="Upload" :loading="loading">上传 CSV</el-button>
-          </el-upload>
+          <el-button type="primary" :icon="Refresh" :loading="loading" @click="loadData">载入数据</el-button>
+          <el-button type="success" :loading="loading" @click="startRegression">开始回归</el-button>
         </el-form-item>
         <el-form-item label="样本规模">
           <el-tag>{{ points.length }} 个样本</el-tag>
@@ -90,9 +88,10 @@
 import { computed, nextTick, onMounted, ref } from 'vue'
 import * as echarts from 'echarts'
 import { ElMessage } from 'element-plus'
-import { Refresh, Upload } from '@element-plus/icons-vue'
-import { runRegression, uploadRegression } from '../api/request'
+import { Refresh } from '@element-plus/icons-vue'
+import { fetchRegressionRows, runRegression } from '../api/request'
 
+const rawRows = ref([])
 const points = ref([])
 const models = ref([])
 const trainSize = ref(0)
@@ -104,6 +103,7 @@ const chartRefs = {
   ransac: ref(null),
 }
 const chartInstances = {}
+const resizeFrames = {}
 
 const chartConfigs = [
   {
@@ -210,11 +210,27 @@ function renderChart(config) {
       },
     ],
   })
-  chartInstances[config.key].resize()
+  scheduleChartResize(config.key)
 }
 
 function renderCharts() {
   chartConfigs.forEach(renderChart)
+}
+
+function scheduleChartResize(key) {
+  if (resizeFrames[key]) cancelAnimationFrame(resizeFrames[key])
+  resizeFrames[key] = requestAnimationFrame(() => {
+    chartInstances[key]?.resize()
+    resizeFrames[key] = null
+  })
+}
+
+function clearCharts() {
+  Object.entries(resizeFrames).forEach(([key, frame]) => {
+    if (frame) cancelAnimationFrame(frame)
+    resizeFrames[key] = null
+  })
+  Object.values(chartInstances).forEach((chart) => chart.clear())
 }
 
 async function applyResult(response, message) {
@@ -227,13 +243,23 @@ async function applyResult(response, message) {
   ElMessage.success(message)
 }
 
-async function analyzeDefault() {
+async function applyLoadedRows(rows, message) {
+  rawRows.value = rows
+  points.value = rows
+  models.value = []
+  trainSize.value = 0
+  testSize.value = 0
+  clearCharts()
+  ElMessage.success(message)
+}
+
+async function loadData() {
   loading.value = true
   try {
-    const response = await runRegression()
-    await applyResult(response, '默认数据集已载入，回归分析完成')
+    const response = await fetchRegressionRows()
+    await applyLoadedRows(response.data.rows || [], '数据已载入')
   } catch (error) {
-    ElMessage.error(error.response?.data?.message || '默认数据集载入失败，请检查后端服务')
+    ElMessage.error(error.response?.data?.message || '数据载入失败，请检查后端服务')
   } finally {
     loading.value = false
   }
@@ -251,20 +277,16 @@ async function analyzeRows(rows, message) {
   }
 }
 
-async function handleUpload(file) {
-  loading.value = true
-  try {
-    const response = await uploadRegression(file)
-    loading.value = false
-    await analyzeRows(response.data.rows || [], 'CSV 已上传，回归分析完成')
-  } catch (error) {
-    ElMessage.error(error.response?.data?.message || 'CSV 上传失败，请检查文件格式')
-    loading.value = false
+async function startRegression() {
+  const rows = rawRows.value.length ? rawRows.value : points.value
+  if (!rows.length) {
+    ElMessage.warning('请先载入数据')
+    return
   }
-  return false
+  await analyzeRows(rows, '回归分析完成')
 }
 
-onMounted(analyzeDefault)
+onMounted(loadData)
 </script>
 
 <style scoped>

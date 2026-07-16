@@ -2,7 +2,7 @@
   <section class="page">
     <div class="page-title">
       <strong>聚类分析</strong>
-      <span>StandardScaler + K-Means</span>
+      <span>K-Means</span>
     </div>
 
     <el-card shadow="never" class="toolbar-card">

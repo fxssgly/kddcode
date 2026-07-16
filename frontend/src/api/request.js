@@ -35,6 +35,36 @@ export function uploadRegression(file) {
   return request.post('/api/regression/upload', form)
 }
 
+export function fetchRegressionRows() {
+  return request.get('/data/regression_experiment.csv', {
+    responseType: 'text',
+    transformResponse: [(data) => data],
+  }).then((response) => {
+    const rows = parseRegressionCsv(response.data)
+    return {
+      data: {
+        total: rows.length,
+        rows,
+      },
+    }
+  })
+}
+
+function parseRegressionCsv(text) {
+  const lines = String(text || '').replace(/^\uFEFF/, '').split(/\r?\n/).filter((line) => line.trim())
+  const headers = lines.shift()?.split(',').map((header) => header.trim()) || []
+  return lines.map((line, index) => {
+    const values = line.split(',').map((value) => value.trim())
+    const row = Object.fromEntries(headers.map((header, headerIndex) => [header, values[headerIndex]]))
+    return {
+      id: Number(row.id || row.ID || index + 1),
+      x: Number(row.x || row.X || 0),
+      y: Number(row.y || row.Y || 0),
+      type: row.type || row.Type || '正常点',
+    }
+  })
+}
+
 export function runAssociation(minSupport, minConfidence) {
   return request.post('/api/association', {
     min_support: minSupport,
