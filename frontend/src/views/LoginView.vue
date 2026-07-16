@@ -27,6 +27,7 @@
 <script setup>
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { getUsers, saveUsers, setLoggedIn } from '../auth'
 
 const router = useRouter()
 const mode = ref('login')
@@ -34,18 +35,9 @@ const modeOptions = [
   { label: '登录', value: 'login' },
   { label: '注册', value: 'register' },
 ]
-const username = ref('admin')
-const password = ref('123456')
+const username = ref('')
+const password = ref('')
 const message = ref('')
-
-function getUsers() {
-  const saved = localStorage.getItem('kdd_users')
-  return saved ? JSON.parse(saved) : [{ username: 'admin', password: '123456' }]
-}
-
-function saveUsers(users) {
-  localStorage.setItem('kdd_users', JSON.stringify(users))
-}
 
 function submit() {
   message.value = ''
@@ -80,8 +72,7 @@ function login() {
     message.value = '账号或密码错误'
     return
   }
-  localStorage.setItem('kdd_logged_in', 'true')
-  localStorage.setItem('kdd_current_user', username.value)
+  setLoggedIn(username.value)
   router.push('/association')
 }
 </script>

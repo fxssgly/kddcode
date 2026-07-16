@@ -47,6 +47,7 @@
 <script setup>
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { logout as clearLogin } from './auth'
 
 const router = useRouter()
 const authorDialogVisible = ref(false)
@@ -57,7 +58,7 @@ const authors = [
 ]
 
 function logout() {
-  localStorage.removeItem('kdd_logged_in')
+  clearLogin()
   router.push('/login')
 }
 </script>
