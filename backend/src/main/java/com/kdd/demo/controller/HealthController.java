@@ -15,6 +15,9 @@ import java.util.Map;
         "http://localhost:5173"
 })
 public class HealthController {
+    /**
+     * 根路径接口，用于在浏览器里做一个轻量级启动检查。
+     */
     @GetMapping("/")
     public Map<String, Object> index() {
         Map<String, Object> result = new HashMap<>();
@@ -23,6 +26,9 @@ public class HealthController {
         return result;
     }
 
+    /**
+     * 面向程序读取的健康检查接口，供前端启动时判断后端状态。
+     */
     @GetMapping("/api/health")
     public Map<String, Object> health() {
         Map<String, Object> result = new HashMap<>();

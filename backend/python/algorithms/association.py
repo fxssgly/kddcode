@@ -5,18 +5,21 @@ from algorithms.common import as_float, as_text
 
 
 def association(payload):
+    """挖掘频繁项集和简单的二项关联规则。"""
     transactions = payload.get("transactions") or []
     min_support = as_float(payload.get("min_support"), 0.2)
     min_confidence = as_float(payload.get("min_confidence"), 0.4)
     total = float(len(transactions) or 1)
     itemsets = {}
 
+    # 统计每个事务篮子中所有 1 项、2 项和 3 项组合的出现次数。
     for transaction in transactions:
         values = sorted(set([as_text(item) for item in transaction if as_text(item).strip()]))
         for size in (1, 2, 3):
             for combo in itertools.combinations(values, size):
                 itemsets[combo] = itemsets.get(combo, 0) + 1
 
+    # 保留出现比例达到支持度阈值的项集。
     frequent = []
     for items, count in itemsets.items():
         support = count / total
@@ -28,6 +31,7 @@ def association(payload):
             })
     frequent.sort(key=lambda item: (item["support"], item["count"]), reverse=True)
 
+    # 二项指标更适合前端图表展示：每个二项组合的支持度、置信度和提升度。
     pair_metrics = []
     for items, count in itemsets.items():
         if len(items) != 2:
@@ -50,6 +54,7 @@ def association(payload):
         })
     pair_metrics.sort(key=lambda item: (item["support"], item["lift"]), reverse=True)
 
+    # 对每个频繁二项组合生成 A -> B 和 B -> A 两个方向的规则。
     rules = []
     for items, count in itemsets.items():
         if len(items) != 2:

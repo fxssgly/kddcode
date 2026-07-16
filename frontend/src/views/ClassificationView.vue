@@ -7,6 +7,7 @@
 
     <el-card shadow="never" class="toolbar-card">
       <el-form inline label-width="92px">
+        <!-- 分类实验的主要参数：树高度和叶子节点最小样本数。 -->
         <el-form-item label="数据操作">
           <el-button type="primary" @click="loadData">载入数据</el-button>
           <el-upload :show-file-list="false" accept=".csv" :before-upload="handleUpload">
@@ -52,9 +53,12 @@ import { ElMessage } from 'element-plus'
 import { fetchIris, runClassification, uploadIris } from '../api/request'
 import DataTable from './components/DataTable.vue'
 
+// rows 保存表格数据，分类完成后每行会带 predicted 字段。
 const rows = ref([])
 const maxDepth = ref(4)
 const minLeaf = ref(2)
+
+// 这几个指标以文本形式保存，便于直接显示在卡片头部。
 const accuracyText = ref('-')
 const precisionText = ref('-')
 const recallText = ref('-')
@@ -62,6 +66,7 @@ const f1Text = ref('-')
 const chartRef = ref(null)
 let chart = null
 
+// 不同 Iris 类别对应的基础颜色，树节点会根据类别纯度做浅色混合。
 const classPalette = {
   setosa: [252, 186, 122],
   versicolor: [119, 191, 229],
@@ -70,10 +75,12 @@ const classPalette = {
 }
 
 function classColor(className) {
+  // 未知类别使用中性色，防止后端返回新类别时图表报错。
   return classPalette[className] || classPalette.unknown
 }
 
 function blendedNodeColor(node) {
+  // 根据节点中占比最高的类别计算纯度，纯度越高颜色越接近类别基础色。
   const base = classColor(node.className || node.name)
   const values = Array.isArray(node.value) ? node.value : []
   const samples = Number(node.samples || values.reduce((sum, item) => sum + Number(item || 0), 0) || 1)
@@ -85,10 +92,12 @@ function blendedNodeColor(node) {
 }
 
 function formatRule(name) {
+  // 规则文本预留格式化入口，后续如果需要替换字段名可在这里统一处理。
   return String(name || '').replace(' <= ', ' <= ')
 }
 
 function buildNodeLabel(node) {
+  // ECharts tree 节点只显示 name，所以把 CART 节点信息拼成多行标签。
   const rule = node.children && node.children.length ? formatRule(node.name) : `class = ${node.className || node.name}`
   const criterion = node.criterion || 'gini'
   const impurity = Number(node.impurity || 0).toFixed(3)
@@ -99,6 +108,7 @@ function buildNodeLabel(node) {
 }
 
 function decorateTree(node) {
+  // 递归给每个节点补充 ECharts 样式和展示标签，保留原始 children 结构。
   const children = (node.children || []).map(decorateTree)
   const isLeaf = children.length === 0
   return {
@@ -119,6 +129,7 @@ function decorateTree(node) {
 }
 
 function treeStats(node, depth = 0) {
+  // 统计树深度和叶子数，用来动态设置画布大小，避免节点挤在一起。
   const children = node.children || []
   if (!children.length) {
     return { depth, leaves: 1 }
@@ -135,6 +146,7 @@ function treeStats(node, depth = 0) {
 function renderTree(tree) {
   if (!chartRef.value || !tree) return
   const stats = treeStats(tree)
+  // 树越宽或越深，图表容器越大；外层 tree-scroll 负责滚动查看。
   const chartWidth = Math.max(1180, stats.leaves * 240)
   const chartHeight = Math.max(780, (stats.depth + 1) * 180)
   chartRef.value.style.width = `${chartWidth}px`
@@ -149,6 +161,7 @@ function renderTree(tree) {
       formatter: (params) => String(params.name || '').replace(/\n/g, '<br/>'),
     },
     series: [{
+      // tree 系列负责绘制决策树，roam=true 允许拖拽和平移缩放。
       type: 'tree',
       orient: 'vertical',
       data: [decorateTree(tree)],
@@ -195,6 +208,7 @@ function renderTree(tree) {
 }
 
 function clearTree() {
+  // 重新载入数据后，旧树和旧指标都需要清空。
   if (chart) chart.clear()
   accuracyText.value = '-'
   precisionText.value = '-'
@@ -203,6 +217,7 @@ function clearTree() {
 }
 
 async function loadData() {
+  // 载入默认 Iris 分类数据。
   const response = await fetchIris('classification')
   rows.value = response.data.rows
   clearTree()
@@ -210,6 +225,7 @@ async function loadData() {
 }
 
 async function handleUpload(file) {
+  // 上传用户提供的 Iris CSV，并阻止 Element Plus 自动上传。
   const response = await uploadIris(file)
   rows.value = response.data.rows
   clearTree()
@@ -222,12 +238,14 @@ async function analyze() {
     ElMessage.warning('请先载入数据')
     return
   }
+  // 后端返回预测结果、指标和树结构；前端负责展示和绘制。
   const response = await runClassification(maxDepth.value, minLeaf.value)
   rows.value = response.data.rows
   accuracyText.value = `${Math.round(response.data.accuracy * 100)}%`
   precisionText.value = Number(response.data.precision || 0).toFixed(3)
   recallText.value = Number(response.data.recall || 0).toFixed(3)
   f1Text.value = Number(response.data.f1 || 0).toFixed(3)
+  // 等表格和图表容器完成更新后再渲染决策树。
   await nextTick()
   renderTree(response.data.tree)
   ElMessage.success('分类分析完成')

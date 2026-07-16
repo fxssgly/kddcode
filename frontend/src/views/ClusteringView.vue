@@ -7,6 +7,7 @@
 
     <el-card shadow="never" class="toolbar-card">
       <el-form inline label-width="86px">
+        <!-- 数据操作和算法参数放在同一行，方便实验时反复调整 k 值。 -->
         <el-form-item label="数据操作">
           <el-button type="primary" @click="loadData">载入数据</el-button>
           <el-upload :show-file-list="false" accept=".csv" :before-upload="handleUpload">
@@ -44,20 +45,26 @@ import { ElMessage } from 'element-plus'
 import { fetchIris, runClustering, uploadIris } from '../api/request'
 import DataTable from './components/DataTable.vue'
 
+// rows 保存表格和散点图共同使用的数据。
 const rows = ref([])
+// centers 保存后端返回的聚类中心，用菱形标记叠加到散点图上。
 const centers = ref([])
 const k = ref(3)
 const chartRef = ref(null)
 let chart = null
+
+// Iris 的 4 个数值特征，用于前端 PCA 降维展示。
 const featureNames = ['sepal_length', 'sepal_width', 'petal_length', 'petal_width']
 
 function scatterSize(count) {
+  // 数据越多点越小，减少图表重叠。
   if (count > 300) return 5
   if (count > 120) return 6
   return 8
 }
 
 function valueAxis(name) {
+  // 聚类图和回归图都使用类似的数值坐标轴风格。
   return {
     type: 'value',
     name,
@@ -76,6 +83,7 @@ function valueAxis(name) {
 }
 
 function toNumber(value) {
+  // 上传 CSV 时数值可能是字符串，这里统一转成可计算数字。
   const number = Number(value)
   return Number.isFinite(number) ? number : 0
 }
@@ -84,6 +92,7 @@ function standardizeMatrix(matrix) {
   if (!matrix.length) return []
   const count = matrix.length
   const columns = matrix[0].length
+  // PCA 前先标准化，避免不同量纲的特征影响主成分方向。
   const means = Array.from({ length: columns }, (_, columnIndex) => (
     matrix.reduce((total, row) => total + row[columnIndex], 0) / count
   ))
@@ -95,14 +104,17 @@ function standardizeMatrix(matrix) {
 }
 
 function matVec(matrix, vector) {
+  // 矩阵乘向量，是幂迭代求特征向量的基础操作。
   return matrix.map((row) => row.reduce((total, value, index) => total + value * vector[index], 0))
 }
 
 function vectorNorm(vector) {
+  // 向量长度为 0 时返回 1，避免后续除以 0。
   return Math.sqrt(vector.reduce((total, value) => total + value * value, 0)) || 1
 }
 
 function powerIteration(matrix, initial = null) {
+  // 幂迭代用于估计协方差矩阵最大的特征值和特征向量。
   let vector = initial ? [...initial] : Array.from({ length: matrix.length }, () => 1)
   vector = vector.map((value) => value / vectorNorm(vector))
   for (let index = 0; index < 80; index++) {
@@ -120,6 +132,7 @@ function covarianceModel(matrix) {
   if (!matrix.length) return null
   const count = matrix.length
   const columns = matrix[0].length
+  // 中心化后的矩阵用于计算协方差矩阵。
   const means = Array.from({ length: columns }, (_, columnIndex) => (
     matrix.reduce((total, row) => total + row[columnIndex], 0) / count
   ))
@@ -131,6 +144,7 @@ function covarianceModel(matrix) {
     ))
   ))
   const first = powerIteration(covariance)
+  // 从协方差矩阵中减去第一主成分的贡献，再求第二主成分。
   const deflated = covariance.map((row, rowIndex) => (
     row.map((value, columnIndex) => value - first.eigenvalue * first.vector[rowIndex] * first.vector[columnIndex])
   ))
@@ -139,6 +153,7 @@ function covarianceModel(matrix) {
 }
 
 function rowsWithPca(sourceRows) {
+  // 在不修改原始行对象的前提下，为每行附加 pca1/pca2，供二维散点图展示。
   const nextRows = sourceRows.map((row) => ({ ...row }))
   const matrix = standardizeMatrix(nextRows.map((row) => featureNames.map((name) => toNumber(row[name]))))
   const model = covarianceModel(matrix)
@@ -157,6 +172,7 @@ function renderChart() {
   if (!chartRef.value) return
   if (!chart) chart = echarts.init(chartRef.value)
   chart.clear()
+  // 如果已经有 cluster 字段，则按聚类结果分组；否则展示为未聚类数据。
   const hasClusterResult = rows.value.some((item) => item.cluster !== undefined)
   const groups = {}
   rows.value.forEach((item) => {
@@ -166,6 +182,7 @@ function renderChart() {
     const y = item.pca2 ?? item.petal_width
     groups[name].push([x, y, item.species])
   })
+  // 每个聚类类别生成一个 scatter series，图例会自动展示类别名称。
   const clusterSeries = Object.keys(groups).map((name) => ({
     name,
     type: 'scatter',
@@ -206,6 +223,7 @@ function renderChart() {
       {
         name: '聚类中心',
         type: 'scatter',
+        // 聚类中心使用菱形，和普通样本点区分。
         symbol: 'diamond',
         symbolSize: 18,
         itemStyle: {
@@ -234,6 +252,7 @@ function renderChart() {
 }
 
 async function loadData() {
+  // 载入默认 Iris 数据后，先在前端计算 PCA 并立即绘制未聚类散点图。
   const response = await fetchIris('clustering')
   rows.value = rowsWithPca(response.data.rows)
   centers.value = []
@@ -243,6 +262,7 @@ async function loadData() {
 }
 
 async function handleUpload(file) {
+  // 上传 CSV 后同样计算 PCA；返回 false 由我们接管上传流程。
   const response = await uploadIris(file)
   rows.value = rowsWithPca(response.data.rows)
   centers.value = []
@@ -257,6 +277,7 @@ async function analyze() {
     ElMessage.warning('请先载入数据')
     return
   }
+  // 聚类本身由后端完成；前端负责接收聚类标签和中心点并重绘图表。
   const response = await runClustering(k.value)
   rows.value = response.data.rows
   centers.value = response.data.centers || []

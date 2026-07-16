@@ -18,6 +18,7 @@ HANDLERS = {
 
 
 def main():
+    """读取一个 JSON 请求文件，分发到对应算法，并把 JSON 结果写到标准输出。"""
     with open(sys.argv[1], "rb") as file_obj:
         raw_request = file_obj.read()
     if isinstance(raw_request, binary_type):
@@ -27,6 +28,8 @@ def main():
     payload = request.get("payload") or {}
     if operation not in HANDLERS:
         raise ValueError("Unknown operation: %s" % operation)
+
+    # Spring 会把标准输出当作算法响应读取，所以这里必须只输出 JSON。
     sys.stdout.write(json.dumps(HANDLERS[operation](payload), ensure_ascii=True))
 
 

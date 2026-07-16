@@ -22,9 +22,16 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 })
 @AutoConfigureMockMvc
 class DataMiningControllerTest {
+    /**
+     * MockMvc 可以在不真正启动浏览器的情况下调用控制器接口，
+     * 用来验证后端 JSON 响应结构是否符合前端预期。
+     */
     @Autowired
     private MockMvc mockMvc;
 
+    /**
+     * 验证健康检查、Iris 数据和事务数据接口都能返回基础演示数据。
+     */
     @Test
     void healthAndDataEndpointsReturnDemoData() throws Exception {
         mockMvc.perform(get("/api/health"))
@@ -40,6 +47,9 @@ class DataMiningControllerTest {
                 .andExpect(jsonPath("$.total", greaterThan(0)));
     }
 
+    /**
+     * 验证四类数据挖掘接口可以完成调用，并返回关键结果字段。
+     */
     @Test
     void analysisEndpointsCallPythonAndReturnResults() throws Exception {
         mockMvc.perform(post("/api/clustering")
@@ -67,6 +77,9 @@ class DataMiningControllerTest {
                 .andExpect(jsonPath("$.rules").isArray());
     }
 
+    /**
+     * 验证上传 GBK 编码中文 CSV 时，后端能够正确识别并修复中文内容。
+     */
     @Test
     void uploadedTransactionCsvSupportsChineseGbk() throws Exception {
         byte[] content = "transaction_id,items\n1,牛奶,面包\n2,牛奶,鸡蛋\n"

@@ -8,16 +8,29 @@
 
       <el-form label-position="top">
         <el-form-item label="账号">
-          <el-input v-model="username" placeholder="请输入账号" />
+          <el-input v-model.trim="username" placeholder="请输入账号" />
         </el-form-item>
         <el-form-item label="密码">
-          <el-input v-model="password" type="password" placeholder="请输入密码" show-password @keyup.enter="submit" />
+          <el-input
+            v-model="password"
+            type="password"
+            placeholder="请输入密码"
+            show-password
+            @keyup.enter="submit"
+          />
         </el-form-item>
       </el-form>
 
-      <el-alert v-if="message" :title="message" type="error" show-icon :closable="false" class="login-alert" />
+      <el-alert
+        v-if="message"
+        :title="message"
+        :type="messageType"
+        show-icon
+        :closable="false"
+        class="login-alert"
+      />
 
-      <el-button type="primary" class="login-button" @click="submit">
+      <el-button type="primary" class="login-button" :loading="loading" @click="submit">
         {{ mode === 'login' ? '登录系统' : '注册账号' }}
       </el-button>
     </el-card>
@@ -27,7 +40,8 @@
 <script setup>
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { getUsers, saveUsers, setLoggedIn } from '../auth'
+import { loginUser, registerUser } from '../api/request'
+import { setLoggedIn } from '../auth'
 
 const router = useRouter()
 const mode = ref('login')
@@ -38,41 +52,45 @@ const modeOptions = [
 const username = ref('')
 const password = ref('')
 const message = ref('')
+const messageType = ref('error')
+const loading = ref(false)
 
-function submit() {
+// 登录和注册共用同一个提交按钮，根据 mode 决定调用哪个接口。
+async function submit() {
   message.value = ''
+  messageType.value = 'error'
   if (!username.value || !password.value) {
     message.value = '请输入账号和密码'
     return
   }
-  if (mode.value === 'register') {
-    register()
-  } else {
-    login()
+
+  loading.value = true
+  try {
+    if (mode.value === 'register') {
+      await register()
+    } else {
+      await login()
+    }
+  } catch (error) {
+    message.value = error.response?.data?.message || '操作失败，请确认后端和 MySQL 已启动'
+  } finally {
+    loading.value = false
   }
 }
 
-function register() {
-  const users = getUsers()
-  if (users.some((user) => user.username === username.value)) {
-    message.value = '账号已存在'
-    return
-  }
-  users.push({ username: username.value, password: password.value })
-  saveUsers(users)
+// 注册成功后不直接进入系统，而是切回登录模式，让用户重新登录。
+async function register() {
+  await registerUser(username.value, password.value)
   mode.value = 'login'
-  message.value = ''
+  password.value = ''
+  messageType.value = 'success'
+  message.value = '注册成功，请登录'
 }
 
-function login() {
-  const matched = getUsers().some((user) => (
-    user.username === username.value && user.password === password.value
-  ))
-  if (!matched) {
-    message.value = '账号或密码错误'
-    return
-  }
-  setLoggedIn(username.value)
+// 登录成功后保存本地登录态，并跳转到默认实验页面。
+async function login() {
+  const response = await loginUser(username.value, password.value)
+  setLoggedIn(response.data.user)
   router.push('/association')
 }
 </script>

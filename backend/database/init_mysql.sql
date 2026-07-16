@@ -1,15 +1,28 @@
--- Initialize the KDD demo database for MySQL.
--- This script recreates demo tables and reloads sample data from the project CSV files.
+-- 初始化 KDD 演示用 MySQL 数据库。
+-- 该脚本会重建演示表，并写入 Iris、事务篮子和回归样例数据。
 
+-- 创建数据库并切换字符集，保证中文商品名和中文类型可以正常保存。
 CREATE DATABASE IF NOT EXISTS bigdata DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE bigdata;
 SET NAMES utf8mb4;
 
+-- 先删除旧表，保证多次执行脚本时数据不会重复或结构不一致。
 DROP TABLE IF EXISTS transaction_items;
 DROP TABLE IF EXISTS association_data;
 DROP TABLE IF EXISTS regression_data;
 DROP TABLE IF EXISTS iris;
+DROP TABLE IF EXISTS users;
 
+-- 用户表：保存登录账号和 PBKDF2 密码哈希，不保存明文密码。
+CREATE TABLE users (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  username VARCHAR(50) NOT NULL UNIQUE,
+  password_hash VARCHAR(255) NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  last_login_at TIMESTAMP NULL
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Iris 样本表：用于聚类和分类实验。
 CREATE TABLE iris (
   id INT PRIMARY KEY,
   SepL FLOAT NOT NULL,
@@ -19,6 +32,7 @@ CREATE TABLE iris (
   Species VARCHAR(30) NOT NULL
 ) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- 写入标准 Iris 演示数据。
 INSERT INTO iris (id, SepL, SepW, PetL, PetW, Species) VALUES
 (1,5.1,3.5,1.4,0.2,'setosa'),
 (2,4.9,3,1.4,0.2,'setosa'),
@@ -171,6 +185,7 @@ INSERT INTO iris (id, SepL, SepW, PetL, PetW, Species) VALUES
 (149,6.2,3.4,5.4,2.3,'virginica'),
 (150,5.9,3,5.1,1.8,'virginica');
 
+-- 事务项明细表：一行表示一笔交易中的一个商品。
 CREATE TABLE transaction_items (
   id INT PRIMARY KEY AUTO_INCREMENT,
   transaction_id INT NOT NULL,
@@ -178,12 +193,14 @@ CREATE TABLE transaction_items (
   INDEX idx_transaction_items_transaction_id (transaction_id)
 ) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- 兼容旧版本演示代码的事务字符串表，当前 Java 后端主要读取 transaction_items。
 CREATE TABLE association_data (
   id INT PRIMARY KEY AUTO_INCREMENT,
   transaction_id INT NOT NULL,
   items VARCHAR(255) NOT NULL
 ) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- 写入关联规则实验的事务明细数据。
 INSERT INTO transaction_items (transaction_id, item_name) VALUES
 (101,'面包'),
 (101,'可乐'),
@@ -211,6 +228,7 @@ INSERT INTO transaction_items (transaction_id, item_name) VALUES
 (109,'面包'),
 (109,'可乐');
 
+-- 写入兼容表中的逗号分隔事务数据。
 INSERT INTO association_data (transaction_id, items) VALUES
 (101,'面包,可乐,麦片'),
 (102,'牛奶,可乐'),
@@ -222,6 +240,7 @@ INSERT INTO association_data (transaction_id, items) VALUES
 (108,'牛奶,面包,可乐'),
 (109,'面包,可乐');
 
+-- 回归样例表：包含正常点和噪声点，用于比较线性、多项式和 RANSAC。
 CREATE TABLE regression_data (
   id INT PRIMARY KEY,
   x DOUBLE NOT NULL,
@@ -229,6 +248,7 @@ CREATE TABLE regression_data (
   type VARCHAR(30) NOT NULL
 ) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- 写入回归实验数据。
 INSERT INTO regression_data (id, x, y, type) VALUES
 (1,5.991187,-41.931481,'噪声点'),
 (2,4.050021,-50.655763,'噪声点'),

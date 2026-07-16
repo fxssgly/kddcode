@@ -23,6 +23,10 @@ public class PythonAlgorithmService {
     private final String pythonCommand;
     private final Path pythonScript;
 
+    /**
+     * 保存 JSON 和 Python 调用相关配置。
+     * 默认值允许后端在普通开发机上直接运行，无需额外配置 application.properties。
+     */
     public PythonAlgorithmService(
             ObjectMapper objectMapper,
             @Value("${kdd.python-command:python}") String pythonCommand,
@@ -32,6 +36,10 @@ public class PythonAlgorithmService {
         this.pythonScript = Paths.get(pythonScript);
     }
 
+    /**
+     * 执行一个 Python 算法：
+     * 先写入临时 JSON 请求文件，再启动 Python 脚本，最后解析脚本输出的 JSON。
+     */
     public Map<String, Object> run(String operation, Map<String, Object> payload) {
         try {
             Path input = Files.createTempFile("kdd-input-", ".json");
@@ -40,6 +48,7 @@ public class PythonAlgorithmService {
             request.put("payload", payload);
             Files.writeString(input, objectMapper.writeValueAsString(request), StandardCharsets.UTF_8);
 
+            // 用列表形式构造命令，避免 shell 引号转义问题。
             List<String> command = new ArrayList<>(resolvePythonCommand());
             command.add(resolvePythonScript().toString());
             command.add(input.toString());
@@ -63,6 +72,10 @@ public class PythonAlgorithmService {
         }
     }
 
+    /**
+     * 聚类算法提供 Java 兜底实现，这样即使缺少 Python，课堂演示仍可运行。
+     * 其他算法只在 Python 中实现，因此失败时直接抛出错误。
+     */
     private Map<String, Object> fallbackOrThrow(String operation, Map<String, Object> payload, String message, Exception cause) {
         if ("clustering".equals(operation)) {
             return clusteringFallback(payload);
@@ -73,6 +86,9 @@ public class PythonAlgorithmService {
         throw new IllegalStateException(message, cause);
     }
 
+    /**
+     * 最小版 K-Means 兜底实现，仅在 Python 无法执行时使用。
+     */
     @SuppressWarnings("unchecked")
     private Map<String, Object> clusteringFallback(Map<String, Object> payload) {
         List<Map<String, Object>> rows = new ArrayList<>();
@@ -92,6 +108,7 @@ public class PythonAlgorithmService {
             centers.add(centerFrom(rows.get(index)));
         }
 
+        // 反复执行样本分配和中心点重算，直到稳定或达到迭代上限。
         for (int iteration = 0; iteration < 20; iteration++) {
             List<List<Map<String, Object>>> groups = new ArrayList<>();
             for (int index = 0; index < k; index++) {
@@ -118,6 +135,9 @@ public class PythonAlgorithmService {
         return result;
     }
 
+    /**
+     * 使用欧氏距离为一条 Iris 数据找到最近的聚类中心。
+     */
     private int nearestCenter(Map<String, Object> row, List<Map<String, Double>> centers) {
         int bestIndex = 0;
         double bestDistance = Double.MAX_VALUE;
@@ -131,6 +151,9 @@ public class PythonAlgorithmService {
         return bestIndex;
     }
 
+    /**
+     * 基于 Iris 的四个数值特征计算欧氏距离。
+     */
     private double distance(Map<String, Object> row, Map<String, Double> center) {
         double sum = 0.0;
         for (String feature : Arrays.asList("sepal_length", "sepal_width", "petal_length", "petal_width")) {
@@ -140,6 +163,9 @@ public class PythonAlgorithmService {
         return Math.sqrt(sum);
     }
 
+    /**
+     * 对每个特征取平均值，重新计算一个簇的中心点。
+     */
     private Map<String, Double> averageCenter(List<Map<String, Object>> rows) {
         Map<String, Double> center = new LinkedHashMap<>();
         for (String feature : Arrays.asList("sepal_length", "sepal_width", "petal_length", "petal_width")) {
@@ -152,6 +178,9 @@ public class PythonAlgorithmService {
         return center;
     }
 
+    /**
+     * 使用已有数据行作为 K-Means 的初始中心点。
+     */
     private Map<String, Double> centerFrom(Map<String, Object> row) {
         Map<String, Double> center = new LinkedHashMap<>();
         for (String feature : Arrays.asList("sepal_length", "sepal_width", "petal_length", "petal_width")) {
@@ -160,6 +189,9 @@ public class PythonAlgorithmService {
         return center;
     }
 
+    /**
+     * 为兜底计算安全地转换数值。
+     */
     private double number(Object value, double defaultValue) {
         if (value instanceof Number) {
             return ((Number) value).doubleValue();
@@ -174,6 +206,10 @@ public class PythonAlgorithmService {
         return defaultValue;
     }
 
+    /**
+     * 从当前工作目录或 backend/ 目录解析 Python 脚本路径，
+     * 让应用从两个位置启动时都能找到脚本。
+     */
     private Path resolvePythonScript() {
         if (pythonScript.isAbsolute() || Files.exists(pythonScript)) {
             return pythonScript;
@@ -185,6 +221,9 @@ public class PythonAlgorithmService {
         return pythonScript;
     }
 
+    /**
+     * 在 Windows 和其他本地环境中选择可用的 Python 3 命令。
+     */
     private List<String> resolvePythonCommand() {
         if (!"python".equalsIgnoreCase(pythonCommand)) {
             return Arrays.asList(pythonCommand);
@@ -202,6 +241,9 @@ public class PythonAlgorithmService {
         return Arrays.asList("python");
     }
 
+    /**
+     * 检查某个命令是否能解析到 Python 3。
+     */
     private boolean isPython3(String... command) {
         try {
             List<String> versionCommand = new ArrayList<>(Arrays.asList(command));

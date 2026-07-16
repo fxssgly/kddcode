@@ -7,6 +7,7 @@
 
     <el-card shadow="never" class="toolbar-card">
       <el-form inline label-width="92px">
+        <!-- 回归页使用固定 CSV 数据集，因此工具栏只提供载入和开始回归。 -->
         <el-form-item label="数据集">
           <el-button type="primary" :icon="Refresh" :loading="loading" @click="loadData">载入数据</el-button>
           <el-button type="success" :loading="loading" @click="startRegression">开始回归</el-button>
@@ -78,6 +79,7 @@
             <el-tag>{{ metricLabel(chart.key) }}</el-tag>
           </div>
         </template>
+        <!-- 每种模型各占一个 ECharts 容器，ref 由 chartConfigs 中的 setRef 收集。 -->
         <div :ref="chart.setRef" class="chart regression-chart"></div>
       </el-card>
     </div>
@@ -91,20 +93,29 @@ import { ElMessage } from 'element-plus'
 import { Refresh } from '@element-plus/icons-vue'
 import { fetchRegressionRows, runRegression } from '../api/request'
 
+// rawRows 保存刚从 CSV 载入的原始数据，用于后续提交给后端训练。
 const rawRows = ref([])
+// points 保存当前表格和图表展示的数据；回归后会包含预测值和训练/测试划分。
 const points = ref([])
+// models 保存各回归模型的公式和指标。
 const models = ref([])
 const trainSize = ref(0)
 const testSize = ref(0)
 const loading = ref(false)
+
+// 每张图单独持有 DOM 引用，便于独立初始化和 resize。
 const chartRefs = {
   linear: ref(null),
   polynomial: ref(null),
   ransac: ref(null),
 }
+
+// ECharts 实例缓存，避免重复创建实例。
 const chartInstances = {}
+// resizeFrames 用来合并同一帧内的 resize 请求，减少图表抖动。
 const resizeFrames = {}
 
+// 三张图的差异集中放在配置里，渲染函数可以复用。
 const chartConfigs = [
   {
     key: 'linear',
@@ -130,19 +141,23 @@ const chartConfigs = [
   },
 ]
 
+// 噪声点数量由当前 points 实时计算，数据变更后页面自动刷新。
 const outlierCount = computed(() => points.value.filter((item) => item.type === '噪声点').length)
 
 function sortedPoints() {
+  // 拟合线需要按 x 从小到大连接，否则折线会来回跳。
   return [...points.value].sort((a, b) => a.x - b.x)
 }
 
 function scatterSize(count) {
+  // 根据样本量调整散点大小。
   if (count > 300) return 5
   if (count > 120) return 6
   return 8
 }
 
 function valueAxis(name) {
+  // 统一回归图的坐标轴视觉样式。
   return {
     type: 'value',
     name,
@@ -157,6 +172,7 @@ function valueAxis(name) {
 }
 
 function metricLabel(key) {
+  // 卡片标题右侧显示当前模型指标；未分析时显示等待状态。
   const model = models.value.find((item) => item.key === key)
   if (!model) return '等待分析'
   return `R²=${Number(model.r2).toFixed(4)}，MSE=${Number(model.mse).toFixed(2)}`
@@ -165,6 +181,7 @@ function metricLabel(key) {
 function renderChart(config) {
   const element = chartRefs[config.key].value
   if (!element) return
+  // 第一次渲染时初始化图表，后续只更新配置。
   if (!chartInstances[config.key]) chartInstances[config.key] = echarts.init(element)
   const sorted = sortedPoints()
   chartInstances[config.key].setOption({
@@ -189,6 +206,7 @@ function renderChart(config) {
       {
         name: '训练样本',
         type: 'scatter',
+        // 训练集和测试集分开画，便于观察模型泛化效果。
         symbolSize: scatterSize(sorted.length),
         data: sorted.filter((item) => item.split === 'train').map((item) => [item.x, item.y, item.type]),
         itemStyle: { opacity: 0.62 },
@@ -203,6 +221,7 @@ function renderChart(config) {
       {
         name: config.title.replace('拟合图', ''),
         type: 'line',
+        // 多项式回归使用 smooth 曲线，其它模型使用普通折线。
         smooth: !!config.smooth,
         showSymbol: false,
         lineStyle: { width: 3 },
@@ -214,10 +233,12 @@ function renderChart(config) {
 }
 
 function renderCharts() {
+  // 一次性刷新所有模型图表。
   chartConfigs.forEach(renderChart)
 }
 
 function scheduleChartResize(key) {
+  // setOption 后延后一帧 resize，让浏览器先完成布局计算。
   if (resizeFrames[key]) cancelAnimationFrame(resizeFrames[key])
   resizeFrames[key] = requestAnimationFrame(() => {
     chartInstances[key]?.resize()
@@ -226,6 +247,7 @@ function scheduleChartResize(key) {
 }
 
 function clearCharts() {
+  // 清理未执行的 resize，并清空已有图表内容。
   Object.entries(resizeFrames).forEach(([key, frame]) => {
     if (frame) cancelAnimationFrame(frame)
     resizeFrames[key] = null
@@ -234,6 +256,7 @@ function clearCharts() {
 }
 
 async function applyResult(response, message) {
+  // 后端分析结果统一在这里落到页面状态，避免三个模型分别处理。
   points.value = response.data.points || []
   models.value = response.data.models || []
   trainSize.value = response.data.train_size || 0
@@ -244,6 +267,7 @@ async function applyResult(response, message) {
 }
 
 async function applyLoadedRows(rows, message) {
+  // 只载入数据时不显示模型指标，也不保留旧图表。
   rawRows.value = rows
   points.value = rows
   models.value = []
@@ -254,6 +278,7 @@ async function applyLoadedRows(rows, message) {
 }
 
 async function loadData() {
+  // 加载状态同时绑定两个按钮，防止用户连续点击导致请求重叠。
   loading.value = true
   try {
     const response = await fetchRegressionRows()
@@ -266,6 +291,7 @@ async function loadData() {
 }
 
 async function analyzeRows(rows, message) {
+  // 把当前数据提交给后端，由后端完成线性、多项式和 RANSAC 回归。
   loading.value = true
   try {
     const response = await runRegression('x', 'y', rows)
@@ -278,6 +304,7 @@ async function analyzeRows(rows, message) {
 }
 
 async function startRegression() {
+  // 优先使用刚载入的原始 CSV；如果页面已经有点数据，也允许直接分析 points。
   const rows = rawRows.value.length ? rawRows.value : points.value
   if (!rows.length) {
     ElMessage.warning('请先载入数据')

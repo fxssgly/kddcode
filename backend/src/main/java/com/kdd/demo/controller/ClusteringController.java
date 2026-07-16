@@ -18,10 +18,19 @@ import java.util.Map;
 public class ClusteringController {
     private final AlgorithmService algorithmService;
 
+    /**
+     * 注入共用算法服务。服务层会先组装请求数据，
+     * 再调用 Python 里的具体算法实现。
+     */
     public ClusteringController(AlgorithmService algorithmService) {
         this.algorithmService = algorithmService;
     }
 
+    /**
+     * 对 Iris 的数值特征执行 K-Means 聚类。
+     *
+     * 请求体可以提供 k；未提供时默认使用 3 个簇。
+     */
     @PostMapping({"/api/clustering", "/api/analysis/clustering"})
     public Map<String, Object> clustering(@RequestBody Map<String, Object> body) {
         return algorithmService.clustering(body);

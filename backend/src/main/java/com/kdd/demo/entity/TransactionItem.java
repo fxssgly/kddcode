@@ -8,6 +8,12 @@ import javax.persistence.Table;
 @Entity
 @Table(name = "transaction_items")
 public class TransactionItem {
+    /**
+     * 事务篮子中单个商品项的数据库行映射。
+     *
+     * 多行数据可以拥有相同的 transactionId；DatasetService 会按事务编号
+     * 分组还原成 List<List<String>>，供关联规则挖掘使用。
+     */
     @Id
     private Long id;
 

@@ -4,6 +4,7 @@ from algorithms.common import FEATURES, as_float, as_text
 
 
 def gini(groups):
+    """计算候选划分的加权基尼不纯度。"""
     total = sum(len(group) for group in groups) or 1
     score = 0.0
     for group in groups:
@@ -22,6 +23,7 @@ def gini(groups):
 
 
 def majority(rows):
+    """返回一组数据中出现次数最多的类别标签。"""
     counts = {}
     for row in rows:
         species = row.get("species", "unknown")
@@ -30,6 +32,7 @@ def majority(rows):
 
 
 def class_counts(rows, class_names):
+    """按固定类别顺序返回计数，方便前端展示决策树。"""
     counts = {}
     for row in rows:
         species = row.get("species", "unknown")
@@ -38,10 +41,12 @@ def class_counts(rows, class_names):
 
 
 def node_impurity(rows):
+    """计算单个节点不纯度的便捷封装。"""
     return gini([rows])
 
 
 def node_payload(rows, class_names, name, depth, criterion="gini"):
+    """构建每个树节点上保存的可序列化元数据。"""
     counts = class_counts(rows, class_names)
     class_name = majority(rows)
     return {
@@ -56,10 +61,12 @@ def node_payload(rows, class_names, name, depth, criterion="gini"):
 
 
 def build_tree(rows, depth, max_depth, min_leaf, class_names):
+    """递归构建 CART 风格的二叉决策树。"""
     labels = set(row.get("species", "unknown") for row in rows)
     if depth >= max_depth or len(rows) <= min_leaf or len(labels) == 1:
         return node_payload(rows, class_names, majority(rows), depth)
 
+    # 尝试每个特征阈值，并保留基尼不纯度最低的划分。
     best = None
     for feature in FEATURES:
         values = sorted(set(as_float(row.get(feature)) for row in rows))
@@ -81,6 +88,7 @@ def build_tree(rows, depth, max_depth, min_leaf, class_names):
     if best is None:
         return node_payload(rows, class_names, majority(rows), depth)
 
+    # 同时保存展示字段和机器可读字段，方便前端可视化。
     name = "%s <= %.2f" % (best["feature"], best["threshold"])
     node = node_payload(rows, class_names, name, depth)
     node.update({
@@ -95,6 +103,7 @@ def build_tree(rows, depth, max_depth, min_leaf, class_names):
 
 
 def predict_tree(node, row):
+    """沿着决策树向下查找，直到到达叶子类别。"""
     if "children" not in node:
         return node["name"]
     feature, raw_threshold = node["name"].split(" <= ")
@@ -103,6 +112,7 @@ def predict_tree(node, row):
 
 
 def clean_classification_rows(rows):
+    """移除不可用标签，并用均值填补无效数值。"""
     cleaned = []
     numeric_values = {name: [] for name in FEATURES}
     for row in rows:
@@ -127,6 +137,7 @@ def clean_classification_rows(rows):
         name: (sum(values) / float(len(values))) if values else 0.0
         for name, values in numeric_values.items()
     }
+    # 均值填补可以让演示模型在上传数据不完美时仍然运行。
     for row in cleaned:
         for name in FEATURES:
             if row.get(name) is None:
@@ -135,6 +146,7 @@ def clean_classification_rows(rows):
 
 
 def train_test_split_rows(rows, test_ratio=0.2, seed=123):
+    """不依赖外部库，生成可复现的训练集和测试集划分。"""
     indexed = list(range(len(rows)))
     state = seed
     for index in range(len(indexed) - 1, 0, -1):
@@ -151,6 +163,7 @@ def train_test_split_rows(rows, test_ratio=0.2, seed=123):
 
 
 def classification_metrics(rows):
+    """在测试集上计算宏平均 precision、recall、F1 和准确率。"""
     labels = sorted(set([row.get("species", "unknown") for row in rows] + [row.get("predicted", "unknown") for row in rows]))
     precisions = []
     recalls = []
@@ -179,6 +192,7 @@ def classification_metrics(rows):
 
 
 def classification(payload):
+    """执行完整分类流程，并返回数据行、决策树和评估指标。"""
     rows = clean_classification_rows([dict(row) for row in (payload.get("rows") or [])])
     max_depth = int(as_float(payload.get("max_depth"), 3))
     min_leaf = int(as_float(payload.get("min_leaf"), 2))

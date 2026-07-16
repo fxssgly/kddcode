@@ -29,6 +29,12 @@ public class DatasetService {
     private final TransactionItemRepository transactionRepository;
     private final boolean useMysql;
     private final Charset gbk = Charset.forName("GBK");
+
+    /*
+     * 上传的数据只保存在当前后端进程的内存中。
+     * 这样课堂演示更简单：上传后会立刻影响后续算法调用，
+     * 同时不需要额外实现数据库写入逻辑。
+     */
     private List<Map<String, Object>> uploadedIrisRows;
     private List<List<String>> uploadedTransactions;
 
@@ -41,18 +47,31 @@ public class DatasetService {
         this.useMysql = useMysql;
     }
 
+    /**
+     * 返回用于无监督聚类的 Iris 数据行。
+     */
     public List<Map<String, Object>> getClusteringIrisRows() {
         return getIrisRows(Paths.get("data", "iris.csv"));
     }
 
+    /**
+     * 返回用于有监督分类的 Iris 数据行。
+     */
     public List<Map<String, Object>> getClassificationIrisRows() {
         return getIrisRows(Paths.get("data", "iris2.csv"));
     }
 
+    /**
+     * 返回默认的回归样例数据行。
+     */
     public List<Map<String, Object>> getRegressionRows() {
         return readRegressionCsv(Paths.get("data", "regression_experiment.csv"));
     }
 
+    /**
+     * 按优先级选择当前 Iris 数据源：
+     * 上传文件、可选 MySQL 表、最后是项目自带 CSV 文件。
+     */
     private List<Map<String, Object>> getIrisRows(Path csvPath) {
         if (uploadedIrisRows != null) {
             return uploadedIrisRows;
@@ -67,12 +86,16 @@ public class DatasetService {
                             .collect(Collectors.toList());
                 }
             } catch (RuntimeException ignored) {
-                // MySQL is optional for classroom demos. Fall back to CSV when it is unavailable.
+                // MySQL 在课堂演示中是可选项；不可用时自动回退到 CSV。
             }
         }
         return readIrisCsv(csvPath);
     }
 
+    /**
+     * 从上传数据、可选 MySQL 数据或内置样例 CSV 中选择事务篮子。
+     * 数据库行会按 transaction_id 分组成一笔笔事务。
+     */
     public List<List<String>> getTransactions() {
         if (uploadedTransactions != null) {
             return uploadedTransactions;
@@ -88,26 +111,39 @@ public class DatasetService {
                     return new ArrayList<>(grouped.values());
                 }
             } catch (RuntimeException ignored) {
-                // MySQL is optional for classroom demos. Fall back to CSV when it is unavailable.
+                // MySQL 在课堂演示中是可选项；不可用时自动回退到 CSV。
             }
         }
         return readTransactionsCsv(Paths.get("data", "transactions_sample.csv"));
     }
 
+    /**
+     * 解析并保存上传的 Iris 数据，供后续聚类或分类使用。
+     */
     public List<Map<String, Object>> uploadIris(MultipartFile file) throws IOException {
         uploadedIrisRows = parseIris(file);
         return uploadedIrisRows;
     }
 
+    /**
+     * 解析并保存上传的事务篮子，供后续关联规则挖掘使用。
+     */
     public List<List<String>> uploadTransactions(MultipartFile file) throws IOException {
         uploadedTransactions = parseTransactions(file);
         return uploadedTransactions;
     }
 
+    /**
+     * 解析上传的回归数据，但不保存为全局状态；
+     * 调用方可以把返回的 rows 直接传给回归接口。
+     */
     public List<Map<String, Object>> uploadRegression(MultipartFile file) throws IOException {
         return parseRegressionLines(readTextLines(file.getBytes()));
     }
 
+    /**
+     * 把数据库实体转换成 Python 脚本和前端图表都能识别的 JSON 字段名。
+     */
     private Map<String, Object> toIrisMap(IrisSample sample) {
         Map<String, Object> row = new LinkedHashMap<>();
         row.put("id", sample.getId());
@@ -119,6 +155,9 @@ public class DatasetService {
         return row;
     }
 
+    /**
+     * 读取并解析 Iris CSV 文件；如果发生 IO 错误，会补充文件路径上下文。
+     */
     private List<Map<String, Object>> readIrisCsv(Path path) {
         try {
             return parseIrisLines(readTextLines(Files.readAllBytes(path)));
@@ -127,6 +166,9 @@ public class DatasetService {
         }
     }
 
+    /**
+     * 读取并解析事务 CSV 文件。
+     */
     private List<List<String>> readTransactionsCsv(Path path) {
         try {
             return parseTransactionLines(readTextLines(Files.readAllBytes(path)));
@@ -135,6 +177,10 @@ public class DatasetService {
         }
     }
 
+    /**
+     * 读取并解析回归 CSV 文件。
+     * 这里使用 resolveDataPath，是因为后端可能从仓库根目录或 backend 目录启动。
+     */
     private List<Map<String, Object>> readRegressionCsv(Path path) {
         try {
             return parseRegressionLines(readTextLines(Files.readAllBytes(resolveDataPath(path))));
@@ -143,6 +189,9 @@ public class DatasetService {
         }
     }
 
+    /**
+     * 从当前目录或 backend/ 目录解析数据文件路径。
+     */
     private Path resolveDataPath(Path path) {
         if (Files.exists(path)) {
             return path;
@@ -154,10 +203,17 @@ public class DatasetService {
         return path;
     }
 
+    /**
+     * 对上传的 Iris 文件先做文本编码检测和修复，再进行解析。
+     */
     private List<Map<String, Object>> parseIris(MultipartFile file) throws IOException {
         return parseIrisLines(readTextLines(file.getBytes()));
     }
 
+    /**
+     * 解析上传的事务数据。
+     * 如果文件像 Iris 数据，会转换成离散化篮子，方便复用 Iris 数据做关联规则演示。
+     */
     private List<List<String>> parseTransactions(MultipartFile file) throws IOException {
         List<String> lines = readTextLines(file.getBytes());
         if (!lines.isEmpty() && lines.get(0).toLowerCase().contains("species")) {
@@ -166,6 +222,9 @@ public class DatasetService {
         return parseTransactionLines(lines);
     }
 
+    /**
+     * 把多种常见 Iris CSV 表头命名统一成算法使用的稳定字段结构。
+     */
     private List<Map<String, Object>> parseIrisLines(List<String> lines) {
         List<Map<String, Object>> rows = new ArrayList<>();
         if (lines.isEmpty()) {
@@ -193,6 +252,9 @@ public class DatasetService {
         return rows;
     }
 
+    /**
+     * 解析回归 CSV 行，并规范化必需的 x/y 字段。
+     */
     private List<Map<String, Object>> parseRegressionLines(List<String> lines) {
         List<Map<String, Object>> rows = new ArrayList<>();
         if (lines.isEmpty()) {
@@ -218,6 +280,10 @@ public class DatasetService {
         return rows;
     }
 
+    /**
+     * 解析篮子格式的 CSV 行。
+     * 第一列视为编号，后续非空单元格会变成该事务中的唯一商品项。
+     */
     private List<List<String>> parseTransactionLines(List<String> lines) {
         List<List<String>> transactions = new ArrayList<>();
         for (int index = 0; index < lines.size(); index++) {
@@ -242,6 +308,9 @@ public class DatasetService {
         return transactions;
     }
 
+    /**
+     * 把 Iris 的数值测量值转换成离散化的事务项。
+     */
     private List<List<String>> irisRowsToTransactions(List<Map<String, Object>> rows) {
         List<List<String>> transactions = new ArrayList<>();
         for (Map<String, Object> row : rows) {
@@ -256,6 +325,9 @@ public class DatasetService {
         return transactions;
     }
 
+    /**
+     * 使用两个阈值把数值转换为 low/medium/high 三档。
+     */
     private String level(double value, double low, double high) {
         if (value < low) {
             return "low";
@@ -266,6 +338,9 @@ public class DatasetService {
         return "medium";
     }
 
+    /**
+     * 在一组候选列名中寻找第一个存在的数值字段。
+     */
     private double numberValue(Map<String, String> raw, double defaultValue, String... names) {
         for (String name : names) {
             String value = raw.get(name);
@@ -276,6 +351,10 @@ public class DatasetService {
         return defaultValue;
     }
 
+    /**
+     * 在一组候选列名中寻找第一个存在的文本字段，
+     * 并应用与 CSV 内容相同的编码修复逻辑。
+     */
     private String stringValue(Map<String, String> raw, String defaultValue, String... names) {
         for (String name : names) {
             String value = raw.get(name);
@@ -286,6 +365,10 @@ public class DatasetService {
         return defaultValue;
     }
 
+    /**
+     * 同时按 UTF-8 和 GBK 解码文件字节，然后选择看起来乱码更少的版本。
+     * 这能更好地处理 Excel 保存的中文 CSV 文件。
+     */
     private List<String> readTextLines(byte[] bytes) {
         String utf8Text = new String(bytes, StandardCharsets.UTF_8);
         String gbkText = new String(bytes, gbk);
@@ -294,6 +377,9 @@ public class DatasetService {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * 修复 UTF-8 文本被误按 GBK 解码后产生的常见乱码。
+     */
     private String repairText(String value) {
         if (value == null || value.isBlank()) {
             return value;
@@ -302,6 +388,10 @@ public class DatasetService {
         return scoreText(repaired) < scoreText(value) ? repaired : value;
     }
 
+    /**
+     * 尝试把当前字符串按 GBK 字节重新解释为 UTF-8。
+     * 如果转换失败，则保留原始值。
+     */
     private String repairGbkDecodedUtf8(String value) {
         try {
             return new String(value.getBytes(gbk), StandardCharsets.UTF_8);
@@ -310,6 +400,10 @@ public class DatasetService {
         }
     }
 
+    /**
+     * 给解码后的文本计算乱码分数。
+     * 替换字符和已知乱码片段都会提高分数。
+     */
     private int scoreText(String text) {
         int score = 0;
         for (int index = 0; index < text.length(); index++) {
@@ -326,6 +420,10 @@ public class DatasetService {
         return score;
     }
 
+    /**
+     * 面向当前样例和上传文件的轻量级 CSV 分割器。
+     * 它会移除 UTF-8 BOM，并去掉逗号两侧的空格。
+     */
     private String[] splitCsvLine(String line) {
         return line.replace("\uFEFF", "").split("\\s*,\\s*");
     }

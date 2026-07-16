@@ -43,7 +43,9 @@
         <template #header>
           <div class="card-header">
             <strong>2 阶关联规则置信度热力图</strong>
-            <el-tag type="info">minSupport={{ minSupport }}，minConfidence={{ minConfidence }}</el-tag>
+            <el-tag type="info">
+              minSupport={{ minSupport }}，minConfidence={{ minConfidence }}
+            </el-tag>
           </div>
         </template>
         <div ref="chartRef" class="chart association-chart"></div>
@@ -86,13 +88,18 @@ const minConfidence = ref(0.6)
 const chartRef = ref(null)
 let chart = null
 
+// 把后端返回的二维数组事务转换成表格行，TID 从 101 开始用于贴近样例数据。
 const transactionRows = computed(() => transactions.value.map((items, index) => ({
   id: 101 + index,
   itemsText: items.join('，'),
 })))
 
-const twoItemRules = computed(() => rules.value.filter((rule) => rule.left.length === 1 && rule.right.length === 1))
+// 当前热力图只展示一对一规则，因此过滤掉非二项规则。
+const twoItemRules = computed(() => (
+  rules.value.filter((rule) => rule.left.length === 1 && rule.right.length === 1)
+))
 
+// 从频繁二项集中收集所有商品项，并使用中文排序保证坐标轴顺序稳定。
 const heatmapItems = computed(() => {
   const itemSet = new Set()
   frequentPairs.value.forEach((pair) => pair.items.forEach((item) => itemSet.add(item)))
@@ -100,20 +107,28 @@ const heatmapItems = computed(() => {
 })
 
 function buildHeatmap() {
+  // 构造 ECharts heatmap 数据：[xIndex, yIndex, confidence, pair, rule]。
+  // pair/rule 作为附加数据放进去，tooltip 中可以直接读取支持度、提升度等信息。
   const items = heatmapItems.value
   const indexMap = Object.fromEntries(items.map((item, index) => [item, index]))
   const itemCounts = new Map()
-  transactions.value.forEach((items) => {
-    Array.from(new Set(items)).forEach((item) => {
+
+  // 先统计每个单项出现的事务数，后面用 pair.count / leftCount 计算方向置信度。
+  transactions.value.forEach((itemsInTransaction) => {
+    Array.from(new Set(itemsInTransaction)).forEach((item) => {
       itemCounts.set(item, (itemCounts.get(item) || 0) + 1)
     })
   })
+
+  // 后端返回的二项集没有方向，这里把 A-B 和 B-A 都放入 Map 方便查找。
   const pairMap = new Map()
   frequentPairs.value.forEach((pair) => {
     const [left, right] = pair.items
     pairMap.set(`${left}\u0000${right}`, pair)
     pairMap.set(`${right}\u0000${left}`, pair)
   })
+
+  // 生成完整矩阵。没有出现过的组合也补 0，避免热力图坐标缺格。
   const data = []
   items.forEach((left) => {
     items.forEach((right) => {
@@ -123,12 +138,15 @@ function buildHeatmap() {
       data.push([indexMap[right], indexMap[left], Number(value.toFixed(3)), pair, rule])
     })
   })
+
   return { items, data }
 }
 
 function renderChart() {
   if (!chartRef.value) return
+  // ECharts 实例只初始化一次；之后只 clear + setOption 更新配置。
   if (!chart) chart = echarts.init(chartRef.value)
+
   const { items, data } = buildHeatmap()
   chart.clear()
   chart.setOption({
@@ -141,10 +159,10 @@ function renderChart() {
         const left = items[params.data[1]]
         const right = items[params.data[0]]
         if (!pair || params.data[2] <= 0) {
-          return `${left} → ${right}<br/>置信度：0.000`
+          return `${left} -> ${right}<br/>置信度：0.000`
         }
         return [
-          `${left} → ${right}`,
+          `${left} -> ${right}`,
           `支持度：${pair.support}`,
           `置信度：${params.data[2]}`,
           `提升度：${rule ? rule.lift : '-'}`,
@@ -204,17 +222,15 @@ function renderChart() {
   chart.resize()
 }
 
-function metricName() {
-  return '支持度'
-}
-
 function clearAnalysis() {
+  // 换数据后清空旧规则和旧图表，避免用户误读上一轮分析结果。
   rules.value = []
   frequentPairs.value = []
   if (chart) chart.clear()
 }
 
 async function loadData() {
+  // 从后端读取默认事务数据。
   const response = await fetchTransactions()
   transactions.value = response.data.transactions
   clearAnalysis()
@@ -222,6 +238,7 @@ async function loadData() {
 }
 
 async function handleUpload(file) {
+  // 交给自定义上传逻辑处理，并返回 false 阻止 Element Plus 自动上传。
   const response = await uploadTransactions(file)
   transactions.value = response.data.transactions
   clearAnalysis()
@@ -234,6 +251,7 @@ async function analyze() {
     ElMessage.warning('请先载入数据')
     return
   }
+  // 提交阈值参数后，后端根据当前事务数据重新计算关联规则。
   const response = await runAssociation(minSupport.value, minConfidence.value)
   transactions.value = response.data.transactions
   rules.value = response.data.rules

@@ -5,6 +5,7 @@ from algorithms.common import as_float
 
 
 def regression(payload):
+    """拟合多个回归模型，并返回预测值和评估指标。"""
     rows = payload.get("rows") or []
     x_field = payload.get("x_field") or "x"
     y_field = payload.get("y_field") or "y"
@@ -17,11 +18,13 @@ def regression(payload):
             "type": row.get("type", row.get("species", u"\u6837\u672c")),
         })
 
+    # 所有模型使用同一份训练/测试划分，保证指标可比较。
     train_points, test_points = train_test_split_points(points)
     linear = fit_linear(train_points)
     polynomial = fit_quadratic(train_points)
     ransac = fit_ransac(train_points)
 
+    # 给每个数据点附加所有模型的预测值，方便前端对比。
     for item in points:
         item["linear_predicted"] = predict_linear(linear, item["x"])
         item["polynomial_predicted"] = predict_quadratic(polynomial, item["x"])
@@ -55,6 +58,7 @@ def regression(payload):
 
 
 def train_test_split_points(points, test_ratio=0.2, seed=0):
+    """用确定性方式标记训练集和测试集样本。"""
     indexed = list(range(len(points)))
     state = seed or 1
     for index in range(len(indexed) - 1, 0, -1):
@@ -71,6 +75,7 @@ def train_test_split_points(points, test_ratio=0.2, seed=0):
 
 
 def fit_linear(points):
+    """使用普通最小二乘法拟合 y = slope*x + intercept。"""
     count = float(len(points) or 1)
     mean_x = sum(item["x"] for item in points) / count
     mean_y = sum(item["y"] for item in points) / count
@@ -81,10 +86,12 @@ def fit_linear(points):
 
 
 def predict_linear(model, x_value):
+    """使用线性模型预测 y。"""
     return model.get("slope", 0.0) * x_value + model.get("intercept", 0.0)
 
 
 def fit_quadratic(points):
+    """使用正规方程拟合 y = ax^2 + bx + c。"""
     if len(points) < 3:
         linear = fit_linear(points)
         return {"a": 0.0, "b": linear["slope"], "c": linear["intercept"]}
@@ -107,6 +114,7 @@ def fit_quadratic(points):
 
 
 def solve_linear_system(matrix):
+    """使用高斯-约旦消元法求解增广线性方程组。"""
     size = len(matrix)
     for column in range(size):
         pivot = max(range(column, size), key=lambda row: abs(matrix[row][column]))
@@ -126,10 +134,12 @@ def solve_linear_system(matrix):
 
 
 def predict_quadratic(model, x_value):
+    """使用二次多项式模型预测 y。"""
     return model.get("a", 0.0) * x_value * x_value + model.get("b", 0.0) * x_value + model.get("c", 0.0)
 
 
 def fit_ransac(points):
+    """通过随机采样点对并保留内点，拟合一条稳健直线。"""
     if len(points) < 2:
         return fit_linear(points)
     y_values = [item["y"] for item in points]
@@ -156,6 +166,7 @@ def fit_ransac(points):
 
 
 def regression_metrics(points, model, predictor):
+    """在评估样本上计算均方误差和 R 平方。"""
     if not points:
         return {"mse": 0.0, "r2": 0.0}
     mean_y = sum(item["y"] for item in points) / float(len(points))
@@ -168,6 +179,7 @@ def regression_metrics(points, model, predictor):
 
 
 def build_regression_model(key, name, model, test_points, predictor):
+    """构建一个适合前端使用的模型摘要。"""
     metrics = regression_metrics(test_points, model, predictor)
     result = {
         "key": key,
@@ -199,5 +211,6 @@ def build_regression_model(key, name, model, test_points, predictor):
 
 
 def signed_term(value, suffix):
+    """格式化带符号的公式项，例如 '+ 1.2300x'。"""
     sign = "+" if value >= 0 else "-"
     return "%s %.4f%s" % (sign, abs(value), suffix)
