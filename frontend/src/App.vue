@@ -16,7 +16,12 @@
         <el-menu-item index="/regression">回归分析</el-menu-item>
       </el-menu>
 
-      <el-button class="logout" plain @click="logout">退出登录</el-button>
+      <div class="sidebar-actions">
+        <el-button class="sidebar-button" type="primary" @click="authorDialogVisible = true">
+          联系作者
+        </el-button>
+        <el-button class="sidebar-button" plain @click="logout">退出登录</el-button>
+      </div>
     </el-aside>
 
     <el-container>
@@ -29,13 +34,27 @@
         <RouterView />
       </el-main>
     </el-container>
+
+    <el-dialog v-model="authorDialogVisible" title="小组成员" width="420px">
+      <el-table :data="authors" border>
+        <el-table-column prop="name" label="姓名" />
+        <el-table-column prop="studentId" label="学号" />
+      </el-table>
+    </el-dialog>
   </el-container>
 </template>
 
 <script setup>
+import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 
 const router = useRouter()
+const authorDialogVisible = ref(false)
+const authors = [
+  { name: '顾林奕', studentId: '038123011' },
+  { name: '张秋彤', studentId: '028123236' },
+  { name: '张晨琳', studentId: '028123173' },
+]
 
 function logout() {
   localStorage.removeItem('kdd_logged_in')
@@ -127,12 +146,26 @@ body {
   color: #fff;
 }
 
-.logout {
+.sidebar-actions {
   position: absolute;
   left: 16px;
   right: 16px;
   bottom: 18px;
+  display: grid;
+  gap: 10px;
+}
+
+.sidebar-button {
   width: calc(100% - 32px);
+  margin: 0;
+}
+
+.sidebar-actions .sidebar-button {
+  width: 100%;
+}
+
+.sidebar-actions .el-button + .el-button {
+  margin-left: 0;
 }
 
 .topbar {
