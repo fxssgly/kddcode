@@ -49,6 +49,7 @@ const centers = ref([])
 const k = ref(3)
 const chartRef = ref(null)
 let chart = null
+const featureNames = ['sepal_length', 'sepal_width', 'petal_length', 'petal_width']
 
 function scatterSize(count) {
   if (count > 300) return 5
@@ -74,13 +75,92 @@ function valueAxis(name) {
   }
 }
 
+function toNumber(value) {
+  const number = Number(value)
+  return Number.isFinite(number) ? number : 0
+}
+
+function standardizeMatrix(matrix) {
+  if (!matrix.length) return []
+  const count = matrix.length
+  const columns = matrix[0].length
+  const means = Array.from({ length: columns }, (_, columnIndex) => (
+    matrix.reduce((total, row) => total + row[columnIndex], 0) / count
+  ))
+  const stds = Array.from({ length: columns }, (_, columnIndex) => {
+    const variance = matrix.reduce((total, row) => total + (row[columnIndex] - means[columnIndex]) ** 2, 0) / count
+    return Math.sqrt(variance) || 1
+  })
+  return matrix.map((row) => row.map((value, columnIndex) => (value - means[columnIndex]) / stds[columnIndex]))
+}
+
+function matVec(matrix, vector) {
+  return matrix.map((row) => row.reduce((total, value, index) => total + value * vector[index], 0))
+}
+
+function vectorNorm(vector) {
+  return Math.sqrt(vector.reduce((total, value) => total + value * value, 0)) || 1
+}
+
+function powerIteration(matrix, initial = null) {
+  let vector = initial ? [...initial] : Array.from({ length: matrix.length }, () => 1)
+  vector = vector.map((value) => value / vectorNorm(vector))
+  for (let index = 0; index < 80; index++) {
+    const nextVector = matVec(matrix, vector)
+    const length = vectorNorm(nextVector)
+    if (length < 1e-12) break
+    vector = nextVector.map((value) => value / length)
+  }
+  const transformed = matVec(matrix, vector)
+  const eigenvalue = vector.reduce((total, value, index) => total + value * transformed[index], 0)
+  return { eigenvalue, vector }
+}
+
+function covarianceModel(matrix) {
+  if (!matrix.length) return null
+  const count = matrix.length
+  const columns = matrix[0].length
+  const means = Array.from({ length: columns }, (_, columnIndex) => (
+    matrix.reduce((total, row) => total + row[columnIndex], 0) / count
+  ))
+  const centered = matrix.map((row) => row.map((value, columnIndex) => value - means[columnIndex]))
+  const denominator = Math.max(count - 1, 1)
+  const covariance = Array.from({ length: columns }, (_, rowIndex) => (
+    Array.from({ length: columns }, (_, columnIndex) => (
+      centered.reduce((total, row) => total + row[rowIndex] * row[columnIndex], 0) / denominator
+    ))
+  ))
+  const first = powerIteration(covariance)
+  const deflated = covariance.map((row, rowIndex) => (
+    row.map((value, columnIndex) => value - first.eigenvalue * first.vector[rowIndex] * first.vector[columnIndex])
+  ))
+  const second = powerIteration(deflated, [0.5, -1, 0.75, -0.25])
+  return { centered, vectors: [first.vector, second.vector] }
+}
+
+function rowsWithPca(sourceRows) {
+  const nextRows = sourceRows.map((row) => ({ ...row }))
+  const matrix = standardizeMatrix(nextRows.map((row) => featureNames.map((name) => toNumber(row[name]))))
+  const model = covarianceModel(matrix)
+  if (!model) return nextRows
+  return nextRows.map((row, rowIndex) => {
+    const centeredValues = model.centered[rowIndex]
+    return {
+      ...row,
+      pca1: Number(model.vectors[0].reduce((total, value, index) => total + centeredValues[index] * value, 0).toFixed(4)),
+      pca2: Number(model.vectors[1].reduce((total, value, index) => total + centeredValues[index] * value, 0).toFixed(4)),
+    }
+  })
+}
+
 function renderChart() {
   if (!chartRef.value) return
   if (!chart) chart = echarts.init(chartRef.value)
   chart.clear()
+  const hasClusterResult = rows.value.some((item) => item.cluster !== undefined)
   const groups = {}
   rows.value.forEach((item) => {
-    const name = item.cluster === undefined ? item.species : `第 ${item.cluster + 1} 类`
+    const name = hasClusterResult ? `第 ${item.cluster + 1} 类` : '未聚类数据'
     groups[name] = groups[name] || []
     const x = item.pca1 ?? item.petal_length
     const y = item.pca2 ?? item.petal_width
@@ -103,7 +183,9 @@ function renderChart() {
   }))
   chart.setOption({
     backgroundColor: '#ffffff',
-    color: ['#2563eb', '#f97316', '#16a34a', '#9333ea', '#dc2626', '#0891b2', '#ca8a04', '#db2777'],
+    color: hasClusterResult
+      ? ['#2563eb', '#f97316', '#16a34a', '#9333ea', '#dc2626', '#0891b2', '#ca8a04', '#db2777']
+      : ['#2563eb'],
     tooltip: {
       trigger: 'item',
       backgroundColor: 'rgba(255, 255, 255, 0.96)',
@@ -153,7 +235,7 @@ function renderChart() {
 
 async function loadData() {
   const response = await fetchIris('clustering')
-  rows.value = response.data.rows
+  rows.value = rowsWithPca(response.data.rows)
   centers.value = []
   await nextTick()
   renderChart()
@@ -162,7 +244,7 @@ async function loadData() {
 
 async function handleUpload(file) {
   const response = await uploadIris(file)
-  rows.value = response.data.rows
+  rows.value = rowsWithPca(response.data.rows)
   centers.value = []
   await nextTick()
   renderChart()
