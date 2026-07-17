@@ -15,7 +15,6 @@
   <el-container v-else class="app-shell">
     <el-aside width="248px" class="sidebar">
       <div class="brand">
-        <span class="brand-mark">KDD</span>
         <div>
           <!-- 系统品牌区：固定展示课程/实验平台名称。 -->
           <strong>数据挖掘综合实验</strong>
@@ -114,6 +113,83 @@ body {
   font-family: "Microsoft YaHei", Arial, sans-serif;
 }
 
+/* 全局按钮风格：统一尺寸、圆角、字重和交互反馈。 */
+.el-button {
+  min-height: 34px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  border-color: #d6dee9;
+  background: #fff;
+  color: #334155;
+  font-weight: 600;
+  letter-spacing: 0;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+  transition: background-color 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+}
+
+.el-button:hover,
+.el-button:focus {
+  border-color: #2a9d8f;
+  background: #f0fdfa;
+  color: #1f7f74;
+  box-shadow: 0 4px 10px rgba(42, 157, 143, 0.14);
+  transform: translateY(-1px);
+}
+
+.el-button:active {
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.1);
+  transform: translateY(0);
+}
+
+.el-button.is-disabled,
+.el-button.is-disabled:hover,
+.el-button.is-disabled:focus {
+  border-color: #e5e7eb;
+  background: #f8fafc;
+  color: #94a3b8;
+  box-shadow: none;
+  transform: none;
+}
+
+.el-button--primary {
+  border-color: #2a9d8f;
+  background: #2a9d8f;
+  color: #fff;
+}
+
+.el-button--primary:hover,
+.el-button--primary:focus {
+  border-color: #23877c;
+  background: #23877c;
+  color: #fff;
+}
+
+.el-button--success {
+  border-color: #3b82f6;
+  background: #3b82f6;
+  color: #fff;
+}
+
+.el-button--success:hover,
+.el-button--success:focus {
+  border-color: #2563eb;
+  background: #2563eb;
+  color: #fff;
+}
+
+.el-button.is-plain {
+  border-color: #cbd5e1;
+  background: #f8fafc;
+  color: #475569;
+}
+
+.el-button.is-plain:hover,
+.el-button.is-plain:focus {
+  border-color: #2a9d8f;
+  background: #ecfdf5;
+  color: #1f7f74;
+}
+
 /* 登录页使用全屏网格居中。 */
 .login-page {
   display: grid;
@@ -153,20 +229,28 @@ body {
 /* 品牌区横向排列 logo 与标题。 */
 .brand {
   display: flex;
-  gap: 12px;
   align-items: center;
-  padding: 0 8px 20px;
+  position: relative;
+  padding: 8px 10px 22px 18px;
 }
 
-/* KDD 标识使用固定尺寸，保证侧栏视觉稳定。 */
-.brand-mark {
-  display: grid;
-  width: 44px;
-  height: 44px;
-  place-items: center;
-  border-radius: 8px;
+.brand::before {
+  content: "";
+  position: absolute;
+  left: 8px;
+  top: 9px;
+  width: 4px;
+  height: 25px;
+  border-radius: 999px;
   background: #2a9d8f;
+}
+
+.brand strong {
+  display: block;
+  color: #f8fafc;
+  font-size: 18px;
   font-weight: 700;
+  line-height: 1.35;
 }
 
 .brand small {

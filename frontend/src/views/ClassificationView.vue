@@ -12,7 +12,7 @@
   <section class="page">
     <div class="page-title">
       <strong>分类分析</strong>
-      <span>CART 决策树分类</span>
+      <span>决策树</span>
     </div>
 
     <el-card shadow="never" class="toolbar-card">

@@ -1,26 +1,17 @@
 package com.kdd.demo.service;
 
-/**
- * 文件作用：统一管理实验数据来源，包括内置 CSV、上传 CSV 和可选 MySQL。
- * 项目位置：Service 层，是所有数据集接口和算法服务共同依赖的数据入口。
- * 交互关系：DatasetController 用它返回表格数据；AlgorithmService 用它把数据送进 Python 算法。
- */
 import com.kdd.demo.entity.IrisSample;
 import com.kdd.demo.entity.RegressionSample;
 import com.kdd.demo.entity.TransactionItem;
 import com.kdd.demo.repository.IrisRepository;
 import com.kdd.demo.repository.RegressionRepository;
 import com.kdd.demo.repository.TransactionItemRepository;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -35,188 +26,82 @@ public class DatasetService {
     private final IrisRepository irisRepository;
     private final RegressionRepository regressionRepository;
     private final TransactionItemRepository transactionRepository;
-    private final boolean useMysql;
     private final Charset gbk = Charset.forName("GBK");
-
-    /*
-     * 上传的数据在启用 MySQL 时会写入数据库。
-     * 数据库不可用时才临时保存在当前后端进程的内存中，保证课堂演示不中断。
-     */
-    private List<Map<String, Object>> uploadedIrisRows;
-    private List<List<String>> uploadedTransactions;
 
     public DatasetService(
             IrisRepository irisRepository,
             RegressionRepository regressionRepository,
-            TransactionItemRepository transactionRepository,
-            @Value("${kdd.use-mysql:true}") boolean useMysql) {
+            TransactionItemRepository transactionRepository) {
         this.irisRepository = irisRepository;
         this.regressionRepository = regressionRepository;
         this.transactionRepository = transactionRepository;
-        this.useMysql = useMysql;
     }
 
-    /**
-     * 返回用于无监督聚类的 Iris 数据行。
-     */
     public List<Map<String, Object>> getClusteringIrisRows() {
-        return getIrisRows(Paths.get("data", "iris.csv"));
+        return getIrisRows();
     }
 
-    /**
-     * 返回用于有监督分类的 Iris 数据行。
-     */
     public List<Map<String, Object>> getClassificationIrisRows() {
-        return getIrisRows(Paths.get("data", "iris2.csv"));
+        return getIrisRows();
     }
 
-    /**
-     * 返回默认的回归样例数据行。
-     */
     public List<Map<String, Object>> getRegressionRows() {
-        if (useMysql) {
-            try {
-                List<RegressionSample> samples = regressionRepository.findAllByOrderByIdAsc();
-                if (!samples.isEmpty()) {
-                    return samples.stream()
-                            .map(this::toRegressionMap)
-                            .collect(Collectors.toList());
-                }
-            } catch (RuntimeException ignored) {
-                // MySQL is optional for classroom demos; fall back to CSV when unavailable.
-            }
-        }
-        return readRegressionCsv(Paths.get("data", "regression_experiment.csv"));
+        return regressionRepository.findAllByOrderByIdAsc().stream()
+                .map(this::toRegressionMap)
+                .collect(Collectors.toList());
     }
 
-    /**
-     * 按优先级选择当前 Iris 数据源：
-     * 上传文件、可选 MySQL 表、最后是项目自带 CSV 文件。
-     */
-    private List<Map<String, Object>> getIrisRows(Path csvPath) {
-        if (uploadedIrisRows != null) {
-            return uploadedIrisRows;
-        }
-        if (useMysql) {
-            try {
-                List<IrisSample> samples = irisRepository.findAll();
-                if (!samples.isEmpty()) {
-                    return samples.stream()
-                            .sorted(Comparator.comparing(IrisSample::getId))
-                            .map(this::toIrisMap)
-                            .collect(Collectors.toList());
-                }
-            } catch (RuntimeException ignored) {
-                // MySQL 在课堂演示中是可选项；不可用时自动回退到 CSV。
-            }
-        }
-        return readIrisCsv(csvPath);
+    private List<Map<String, Object>> getIrisRows() {
+        return irisRepository.findAll().stream()
+                .sorted(Comparator.comparing(IrisSample::getId))
+                .map(this::toIrisMap)
+                .collect(Collectors.toList());
     }
 
-    /**
-     * 从上传数据、可选 MySQL 数据或内置样例 CSV 中选择事务篮子。
-     * 数据库行会按 transaction_id 分组成一笔笔事务。
-     */
     public List<List<String>> getTransactions() {
-        if (uploadedTransactions != null) {
-            return uploadedTransactions;
+        List<TransactionItem> rows = transactionRepository.findAllByOrderByTransactionIdAscItemNameAsc();
+        Map<Integer, List<String>> grouped = new TreeMap<>();
+        for (TransactionItem row : rows) {
+            grouped.computeIfAbsent(row.getTransactionId(), key -> new ArrayList<>())
+                    .add(repairText(row.getItemName()));
         }
-        if (useMysql) {
-            try {
-                List<TransactionItem> rows = transactionRepository.findAllByOrderByTransactionIdAscItemNameAsc();
-                if (!rows.isEmpty()) {
-                    Map<Integer, List<String>> grouped = new TreeMap<>();
-                    for (TransactionItem row : rows) {
-                        grouped.computeIfAbsent(row.getTransactionId(), key -> new ArrayList<>()).add(repairText(row.getItemName()));
-                    }
-                    return new ArrayList<>(grouped.values());
-                }
-            } catch (RuntimeException ignored) {
-                // MySQL 在课堂演示中是可选项；不可用时自动回退到 CSV。
-            }
-        }
-        return readTransactionsCsv(Paths.get("data", "transactions_sample.csv"));
+        return new ArrayList<>(grouped.values());
     }
 
-    /**
-     * 解析并保存上传的 Iris 数据，供后续聚类或分类使用。
-     */
     public List<Map<String, Object>> uploadIris(MultipartFile file) throws IOException {
-        List<Map<String, Object>> rows = parseIris(file);
-        if (useMysql) {
-            try {
-                List<IrisSample> samples = rows.stream()
-                        .map(this::toIrisSample)
-                        .collect(Collectors.toList());
-                irisRepository.deleteAll();
-                irisRepository.saveAll(samples);
-                uploadedIrisRows = null;
-                return samples.stream()
-                        .sorted(Comparator.comparing(IrisSample::getId))
-                        .map(this::toIrisMap)
-                        .collect(Collectors.toList());
-            } catch (RuntimeException ignored) {
-                // MySQL is optional for classroom demos; keep uploaded data in memory when unavailable.
-            }
-        }
-        uploadedIrisRows = rows;
-        return uploadedIrisRows;
+        List<IrisSample> samples = parseIris(file).stream()
+                .map(this::toIrisSample)
+                .collect(Collectors.toList());
+        irisRepository.deleteAll();
+        irisRepository.saveAll(samples);
+        return getIrisRows();
     }
 
-    /**
-     * 解析并保存上传的事务篮子，供后续关联规则挖掘使用。
-     */
     public List<List<String>> uploadTransactions(MultipartFile file) throws IOException {
         List<List<String>> transactions = parseTransactions(file);
-        if (useMysql) {
-            try {
-                List<TransactionItem> rows = new ArrayList<>();
-                for (int transactionIndex = 0; transactionIndex < transactions.size(); transactionIndex++) {
-                    for (String item : transactions.get(transactionIndex)) {
-                        TransactionItem row = new TransactionItem();
-                        row.setTransactionId(transactionIndex + 1);
-                        row.setItemName(item);
-                        rows.add(row);
-                    }
-                }
-                transactionRepository.deleteAll();
-                transactionRepository.saveAll(rows);
-                uploadedTransactions = null;
-                return getTransactions();
-            } catch (RuntimeException ignored) {
-                // MySQL is optional for classroom demos; keep uploaded data in memory when unavailable.
+        List<TransactionItem> rows = new ArrayList<>();
+        for (int transactionIndex = 0; transactionIndex < transactions.size(); transactionIndex++) {
+            for (String item : transactions.get(transactionIndex)) {
+                TransactionItem row = new TransactionItem();
+                row.setTransactionId(transactionIndex + 1);
+                row.setItemName(item);
+                rows.add(row);
             }
         }
-        uploadedTransactions = transactions;
-        return uploadedTransactions;
+        transactionRepository.deleteAll();
+        transactionRepository.saveAll(rows);
+        return getTransactions();
     }
 
-    /**
-     * 解析上传的回归数据；启用 MySQL 时会写入 regression_data 表。
-     */
     public List<Map<String, Object>> uploadRegression(MultipartFile file) throws IOException {
-        List<Map<String, Object>> rows = parseRegressionLines(readTextLines(file.getBytes()));
-        if (useMysql) {
-            try {
-                List<RegressionSample> samples = rows.stream()
-                        .map(this::toRegressionSample)
-                        .collect(Collectors.toList());
-                regressionRepository.deleteAll();
-                regressionRepository.saveAll(samples);
-                return samples.stream()
-                        .sorted(Comparator.comparing(RegressionSample::getId))
-                        .map(this::toRegressionMap)
-                        .collect(Collectors.toList());
-            } catch (RuntimeException ignored) {
-                // MySQL is optional for classroom demos; return parsed rows when unavailable.
-            }
-        }
-        return rows;
+        List<RegressionSample> samples = parseRegressionLines(readTextLines(file.getBytes())).stream()
+                .map(this::toRegressionSample)
+                .collect(Collectors.toList());
+        regressionRepository.deleteAll();
+        regressionRepository.saveAll(samples);
+        return getRegressionRows();
     }
 
-    /**
-     * 把数据库实体转换成 Python 脚本和前端图表都能识别的 JSON 字段名。
-     */
     private Map<String, Object> toIrisMap(IrisSample sample) {
         Map<String, Object> row = new LinkedHashMap<>();
         row.put("id", sample.getId());
@@ -257,65 +142,10 @@ public class DatasetService {
         return sample;
     }
 
-    /**
-     * 读取并解析 Iris CSV 文件；如果发生 IO 错误，会补充文件路径上下文。
-     */
-    private List<Map<String, Object>> readIrisCsv(Path path) {
-        try {
-            return parseIrisLines(readTextLines(Files.readAllBytes(path)));
-        } catch (IOException ex) {
-            throw new IllegalStateException("Cannot read iris CSV: " + path.toAbsolutePath(), ex);
-        }
-    }
-
-    /**
-     * 读取并解析事务 CSV 文件。
-     */
-    private List<List<String>> readTransactionsCsv(Path path) {
-        try {
-            return parseTransactionLines(readTextLines(Files.readAllBytes(path)));
-        } catch (IOException ex) {
-            throw new IllegalStateException("Cannot read transactions CSV: " + path.toAbsolutePath(), ex);
-        }
-    }
-
-    /**
-     * 读取并解析回归 CSV 文件。
-     * 这里使用 resolveDataPath，是因为后端可能从仓库根目录或 backend 目录启动。
-     */
-    private List<Map<String, Object>> readRegressionCsv(Path path) {
-        try {
-            return parseRegressionLines(readTextLines(Files.readAllBytes(resolveDataPath(path))));
-        } catch (IOException ex) {
-            throw new IllegalStateException("Cannot read regression CSV: " + path.toAbsolutePath(), ex);
-        }
-    }
-
-    /**
-     * 从当前目录或 backend/ 目录解析数据文件路径。
-     */
-    private Path resolveDataPath(Path path) {
-        if (Files.exists(path)) {
-            return path;
-        }
-        Path backendPath = Paths.get("backend").resolve(path);
-        if (Files.exists(backendPath)) {
-            return backendPath;
-        }
-        return path;
-    }
-
-    /**
-     * 对上传的 Iris 文件先做文本编码检测和修复，再进行解析。
-     */
     private List<Map<String, Object>> parseIris(MultipartFile file) throws IOException {
         return parseIrisLines(readTextLines(file.getBytes()));
     }
 
-    /**
-     * 解析上传的事务数据。
-     * 如果文件像 Iris 数据，会转换成离散化篮子，方便复用 Iris 数据做关联规则演示。
-     */
     private List<List<String>> parseTransactions(MultipartFile file) throws IOException {
         List<String> lines = readTextLines(file.getBytes());
         if (!lines.isEmpty() && lines.get(0).toLowerCase().contains("species")) {
@@ -324,9 +154,6 @@ public class DatasetService {
         return parseTransactionLines(lines);
     }
 
-    /**
-     * 把多种常见 Iris CSV 表头命名统一成算法使用的稳定字段结构。
-     */
     private List<Map<String, Object>> parseIrisLines(List<String> lines) {
         List<Map<String, Object>> rows = new ArrayList<>();
         if (lines.isEmpty()) {
@@ -354,9 +181,6 @@ public class DatasetService {
         return rows;
     }
 
-    /**
-     * 解析回归 CSV 行，并规范化必需的 x/y 字段。
-     */
     private List<Map<String, Object>> parseRegressionLines(List<String> lines) {
         List<Map<String, Object>> rows = new ArrayList<>();
         if (lines.isEmpty()) {
@@ -376,16 +200,12 @@ public class DatasetService {
             row.put("id", (int) numberValue(raw, index, "id", "ID"));
             row.put("x", numberValue(raw, 0, "x", "X"));
             row.put("y", numberValue(raw, 0, "y", "Y"));
-            row.put("type", stringValue(raw, "正常点", "type", "Type"));
+            row.put("type", stringValue(raw, "normal", "type", "Type"));
             rows.add(row);
         }
         return rows;
     }
 
-    /**
-     * 解析篮子格式的 CSV 行。
-     * 第一列视为编号，后续非空单元格会变成该事务中的唯一商品项。
-     */
     private List<List<String>> parseTransactionLines(List<String> lines) {
         List<List<String>> transactions = new ArrayList<>();
         for (int index = 0; index < lines.size(); index++) {
@@ -410,9 +230,6 @@ public class DatasetService {
         return transactions;
     }
 
-    /**
-     * 把 Iris 的数值测量值转换成离散化的事务项。
-     */
     private List<List<String>> irisRowsToTransactions(List<Map<String, Object>> rows) {
         List<List<String>> transactions = new ArrayList<>();
         for (Map<String, Object> row : rows) {
@@ -427,9 +244,6 @@ public class DatasetService {
         return transactions;
     }
 
-    /**
-     * 使用两个阈值把数值转换为 low/medium/high 三档。
-     */
     private String level(double value, double low, double high) {
         if (value < low) {
             return "low";
@@ -440,9 +254,6 @@ public class DatasetService {
         return "medium";
     }
 
-    /**
-     * 在一组候选列名中寻找第一个存在的数值字段。
-     */
     private double numberValue(Map<String, String> raw, double defaultValue, String... names) {
         for (String name : names) {
             String value = raw.get(name);
@@ -453,10 +264,6 @@ public class DatasetService {
         return defaultValue;
     }
 
-    /**
-     * 在一组候选列名中寻找第一个存在的文本字段，
-     * 并应用与 CSV 内容相同的编码修复逻辑。
-     */
     private String stringValue(Map<String, String> raw, String defaultValue, String... names) {
         for (String name : names) {
             String value = raw.get(name);
@@ -467,10 +274,6 @@ public class DatasetService {
         return defaultValue;
     }
 
-    /**
-     * 同时按 UTF-8 和 GBK 解码文件字节，然后选择看起来乱码更少的版本。
-     * 这能更好地处理 Excel 保存的中文 CSV 文件。
-     */
     private List<String> readTextLines(byte[] bytes) {
         String utf8Text = new String(bytes, StandardCharsets.UTF_8);
         String gbkText = new String(bytes, gbk);
@@ -479,9 +282,6 @@ public class DatasetService {
                 .collect(Collectors.toList());
     }
 
-    /**
-     * 修复 UTF-8 文本被误按 GBK 解码后产生的常见乱码。
-     */
     private String repairText(String value) {
         if (value == null || value.isBlank()) {
             return value;
@@ -490,10 +290,6 @@ public class DatasetService {
         return scoreText(repaired) < scoreText(value) ? repaired : value;
     }
 
-    /**
-     * 尝试把当前字符串按 GBK 字节重新解释为 UTF-8。
-     * 如果转换失败，则保留原始值。
-     */
     private String repairGbkDecodedUtf8(String value) {
         try {
             return new String(value.getBytes(gbk), StandardCharsets.UTF_8);
@@ -502,10 +298,6 @@ public class DatasetService {
         }
     }
 
-    /**
-     * 给解码后的文本计算乱码分数。
-     * 替换字符和已知乱码片段都会提高分数。
-     */
     private int scoreText(String text) {
         int score = 0;
         for (int index = 0; index < text.length(); index++) {
@@ -513,7 +305,7 @@ public class DatasetService {
                 score += 10;
             }
         }
-        String[] mojibakeTokens = {"锟", "Ã", "Â", "å", "æ", "ç", "闈", "鍏", "鏁", "绫", "灏", "瀹", "搴", "鐑"};
+        String[] mojibakeTokens = {"?", "Ã", "Â", "å", "æ", "ä", "é", "è", "ç"};
         for (String token : mojibakeTokens) {
             if (text.contains(token)) {
                 score += 5;
@@ -522,10 +314,6 @@ public class DatasetService {
         return score;
     }
 
-    /**
-     * 面向当前样例和上传文件的轻量级 CSV 分割器。
-     * 它会移除 UTF-8 BOM，并去掉逗号两侧的空格。
-     */
     private String[] splitCsvLine(String line) {
         return line.replace("\uFEFF", "").split("\\s*,\\s*");
     }

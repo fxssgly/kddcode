@@ -42,7 +42,7 @@ echo Using Python: %KDD_PYTHON%
 if not defined USE_MYSQL set "USE_MYSQL=true"
 if not defined DB_USER set "DB_USER=root"
 if not defined DB_URL set "DB_URL=jdbc:mysql://127.0.0.1:3306/bigdata?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai"
-if not defined DB_PASSWORD set "DB_PASSWORD=1991"
+if not defined DB_PASSWORD set "DB_PASSWORD=password"
 
 mvn spring-boot:run
 pause

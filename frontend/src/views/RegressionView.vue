@@ -1,7 +1,6 @@
 <!--
   文件作用：回归分析实验页面，展示固定数据集、模型指标和三种回归曲线。
   项目位置：前端 views 层，对应后端 RegressionController 和静态 CSV 数据。
-  交互关系：先读取 public/data 下的 CSV，再把 rows 发送给后端算法，最后用 ECharts 展示预测曲线。
 
   逐词注释：
   rawRows 是 CSV 原始行；points 是带预测值的展示行；models 是模型指标。
@@ -36,7 +35,7 @@
       <template #header>
         <div class="card-header">
           <strong>实验数据表格</strong>
-          <el-tag>regression_experiment.csv</el-tag>
+          <el-tag>regression_data</el-tag>
         </div>
       </template>
       <el-table :data="points" border size="small" height="360">
