@@ -2,6 +2,11 @@
   文件作用：CART 决策树分类实验页面，展示预测结果、评估指标和树形图。
   项目位置：前端 views 层，对应后端 ClassificationController。
   交互关系：把树深和叶子样本数提交给后端，后端返回树结构后由 ECharts tree 系列绘制。
+
+  逐词注释：
+  maxDepth 是最大树高；minLeaf 是叶子节点最小样本数；predicted 是后端预测类别。
+  accuracy/precision/recall/f1 是分类指标；tree 是决策树结构；children 表示子节点。
+  decorate 表示给原始树节点补充样式；roam 表示图表可以拖动和缩放。
 -->
 <template>
   <section class="page">
@@ -59,17 +64,17 @@ import { fetchIris, runClassification, uploadIris } from '../api/request'
 import DataTable from './components/DataTable.vue'
 
 // rows 保存表格数据，分类完成后每行会带 predicted 字段。
-const rows = ref([])
-const maxDepth = ref(4)
-const minLeaf = ref(2)
+const rows = ref([]) // 表格数据，分类后每行会增加 predicted 字段。
+const maxDepth = ref(4) // 决策树最大深度。
+const minLeaf = ref(2) // 叶子节点最少样本数。
 
 // 这几个指标以文本形式保存，便于直接显示在卡片头部。
-const accuracyText = ref('-')
-const precisionText = ref('-')
-const recallText = ref('-')
-const f1Text = ref('-')
-const chartRef = ref(null)
-let chart = null
+const accuracyText = ref('-') // 准确率展示文本。
+const precisionText = ref('-') // 精确率展示文本。
+const recallText = ref('-') // 召回率展示文本。
+const f1Text = ref('-') // F1 值展示文本。
+const chartRef = ref(null) // 决策树图表 DOM 引用。
+let chart = null // ECharts tree 实例。
 
 // 不同 Iris 类别对应的基础颜色，树节点会根据类别纯度做浅色混合。
 const classPalette = {
@@ -87,6 +92,7 @@ function classColor(className) {
 function blendedNodeColor(node) {
   // 根据节点中占比最高的类别计算纯度，纯度越高颜色越接近类别基础色。
   const base = classColor(node.className || node.name)
+  // value 通常是各类别样本数数组，用来计算节点纯度。
   const values = Array.isArray(node.value) ? node.value : []
   const samples = Number(node.samples || values.reduce((sum, item) => sum + Number(item || 0), 0) || 1)
   const maxCount = values.length ? Math.max(...values.map((item) => Number(item || 0))) : samples
@@ -104,6 +110,7 @@ function formatRule(name) {
 function buildNodeLabel(node) {
   // ECharts tree 节点只显示 name，所以把 CART 节点信息拼成多行标签。
   const rule = node.children && node.children.length ? formatRule(node.name) : `class = ${node.className || node.name}`
+  // 内部节点显示切分规则，叶子节点显示最终类别。
   const criterion = node.criterion || 'gini'
   const impurity = Number(node.impurity || 0).toFixed(3)
   const samples = Number(node.samples || 0)
@@ -117,6 +124,7 @@ function decorateTree(node) {
   const children = (node.children || []).map(decorateTree)
   const isLeaf = children.length === 0
   return {
+    // 展开原始 node，保留后端返回的字段，再覆盖 name/children/itemStyle/label。
     ...node,
     name: buildNodeLabel(node),
     children,
@@ -161,6 +169,7 @@ function renderTree(tree) {
   chart.clear()
   chart.resize()
   chart.setOption({
+    // tree 系列读取 data 中的 children 递归绘制整棵树。
     tooltip: {
       trigger: 'item',
       formatter: (params) => String(params.name || '').replace(/\n/g, '<br/>'),
@@ -245,6 +254,7 @@ async function analyze() {
   }
   // 后端返回预测结果、指标和树结构；前端负责展示和绘制。
   const response = await runClassification(maxDepth.value, minLeaf.value)
+  // 指标先格式化成字符串，模板中直接展示即可。
   rows.value = response.data.rows
   accuracyText.value = `${Math.round(response.data.accuracy * 100)}%`
   precisionText.value = Number(response.data.precision || 0).toFixed(3)

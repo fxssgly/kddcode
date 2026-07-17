@@ -2,6 +2,11 @@
   文件作用：回归分析实验页面，展示固定数据集、模型指标和三种回归曲线。
   项目位置：前端 views 层，对应后端 RegressionController 和静态 CSV 数据。
   交互关系：先读取 public/data 下的 CSV，再把 rows 发送给后端算法，最后用 ECharts 展示预测曲线。
+
+  逐词注释：
+  rawRows 是 CSV 原始行；points 是带预测值的展示行；models 是模型指标。
+  linear/polynomial/ransac 分别表示线性、多项式和稳健回归；predictionField 表示预测值字段名。
+  scatter 是散点；line 是拟合线；requestAnimationFrame 表示下一帧再执行 resize。
 -->
 <template>
   <section class="page regression-page">
@@ -99,20 +104,20 @@ import { Refresh } from '@element-plus/icons-vue'
 import { fetchRegressionRows, runRegression } from '../api/request'
 
 // rawRows 保存刚从 CSV 载入的原始数据，用于后续提交给后端训练。
-const rawRows = ref([])
+const rawRows = ref([]) // CSV 载入后的原始样本，不含模型预测结果。
 // points 保存当前表格和图表展示的数据；回归后会包含预测值和训练/测试划分。
-const points = ref([])
+const points = ref([]) // 页面表格和图表实际展示的点，回归后会带 predicted 字段。
 // models 保存各回归模型的公式和指标。
-const models = ref([])
-const trainSize = ref(0)
-const testSize = ref(0)
-const loading = ref(false)
+const models = ref([]) // 模型指标列表，包括公式、R2 和 MSE。
+const trainSize = ref(0) // 训练集样本数。
+const testSize = ref(0) // 测试集样本数。
+const loading = ref(false) // 载入或分析中的统一加载状态。
 
 // 每张图单独持有 DOM 引用，便于独立初始化和 resize。
 const chartRefs = {
-  linear: ref(null),
-  polynomial: ref(null),
-  ransac: ref(null),
+  linear: ref(null), // 线性回归图表 DOM。
+  polynomial: ref(null), // 二次多项式回归图表 DOM。
+  ransac: ref(null), // RANSAC 回归图表 DOM。
 }
 
 // ECharts 实例缓存，避免重复创建实例。
@@ -123,11 +128,11 @@ const resizeFrames = {}
 // 三张图的差异集中放在配置里，渲染函数可以复用。
 const chartConfigs = [
   {
-    key: 'linear',
-    title: '一元线性回归拟合图',
-    predictionField: 'linear_predicted',
-    color: '#2563eb',
-    setRef: (el) => { chartRefs.linear.value = el },
+    key: 'linear', // key 对应 chartRefs、chartInstances 和模型指标里的模型标识。
+    title: '一元线性回归拟合图', // 卡片标题和图例名称来源。
+    predictionField: 'linear_predicted', // 每个点上的线性预测字段。
+    color: '#2563eb', // 拟合线颜色。
+    setRef: (el) => { chartRefs.linear.value = el }, // Vue 会把 DOM 节点传进 el。
   },
   {
     key: 'polynomial',
@@ -190,6 +195,7 @@ function renderChart(config) {
   if (!chartInstances[config.key]) chartInstances[config.key] = echarts.init(element)
   const sorted = sortedPoints()
   chartInstances[config.key].setOption({
+    // 三个 series 分别画训练点、测试点和模型拟合线。
     backgroundColor: '#ffffff',
     color: ['#facc15', '#22c55e', config.color],
     tooltip: {
@@ -246,6 +252,7 @@ function scheduleChartResize(key) {
   // setOption 后延后一帧 resize，让浏览器先完成布局计算。
   if (resizeFrames[key]) cancelAnimationFrame(resizeFrames[key])
   resizeFrames[key] = requestAnimationFrame(() => {
+    // resize 让 ECharts 按最新容器尺寸重新计算画布。
     chartInstances[key]?.resize()
     resizeFrames[key] = null
   })
@@ -263,6 +270,7 @@ function clearCharts() {
 async function applyResult(response, message) {
   // 后端分析结果统一在这里落到页面状态，避免三个模型分别处理。
   points.value = response.data.points || []
+  // models 与 points 同时更新，保证指标表和三张图来自同一次后端结果。
   models.value = response.data.models || []
   trainSize.value = response.data.train_size || 0
   testSize.value = response.data.test_size || 0

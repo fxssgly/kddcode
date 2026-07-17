@@ -2,6 +2,11 @@
   文件作用：K-Means 聚类实验页面，展示 Iris 数据表和 PCA 散点图。
   项目位置：前端 views 层，对应后端 ClusteringController 和 DatasetController。
   交互关系：前端负责参数、表格和图表；后端负责读取数据并执行聚类算法。
+
+  逐词注释：
+  rows 是样本行；centers 是聚类中心；k 是聚类个数；featureNames 是参与 PCA 的特征字段。
+  PCA 是降维展示方法；standardize 表示标准化；covariance 表示协方差；scatter 表示散点图。
+  dataZoom 开启鼠标缩放和平移；series 数组里每个对象是一组点或中心。
 -->
 <template>
   <section class="page">
@@ -51,12 +56,12 @@ import { fetchIris, runClustering, uploadIris } from '../api/request'
 import DataTable from './components/DataTable.vue'
 
 // rows 保存表格和散点图共同使用的数据。
-const rows = ref([])
+const rows = ref([]) // 表格行和散点图点位共用的数据源。
 // centers 保存后端返回的聚类中心，用菱形标记叠加到散点图上。
-const centers = ref([])
-const k = ref(3)
-const chartRef = ref(null)
-let chart = null
+const centers = ref([]) // 聚类中心点，由后端计算后返回。
+const k = ref(3) // K-Means 的 k 值，默认分 3 类。
+const chartRef = ref(null) // 散点图 DOM 引用。
+let chart = null // ECharts 散点图实例。
 
 // Iris 的 4 个数值特征，用于前端 PCA 降维展示。
 const featureNames = ['sepal_length', 'sepal_width', 'petal_length', 'petal_width']
@@ -101,6 +106,7 @@ function standardizeMatrix(matrix) {
   const means = Array.from({ length: columns }, (_, columnIndex) => (
     matrix.reduce((total, row) => total + row[columnIndex], 0) / count
   ))
+  // stds 是每列标准差；标准差为 0 时用 1 替代，避免除以 0。
   const stds = Array.from({ length: columns }, (_, columnIndex) => {
     const variance = matrix.reduce((total, row) => total + (row[columnIndex] - means[columnIndex]) ** 2, 0) / count
     return Math.sqrt(variance) || 1
@@ -123,6 +129,7 @@ function powerIteration(matrix, initial = null) {
   let vector = initial ? [...initial] : Array.from({ length: matrix.length }, () => 1)
   vector = vector.map((value) => value / vectorNorm(vector))
   for (let index = 0; index < 80; index++) {
+    // 重复“矩阵乘向量再归一化”，逐步逼近最大特征向量。
     const nextVector = matVec(matrix, vector)
     const length = vectorNorm(nextVector)
     if (length < 1e-12) break
@@ -181,6 +188,7 @@ function renderChart() {
   const hasClusterResult = rows.value.some((item) => item.cluster !== undefined)
   const groups = {}
   rows.value.forEach((item) => {
+    // 已聚类时按 cluster 分组；未聚类时全部归到同一个系列。
     const name = hasClusterResult ? `第 ${item.cluster + 1} 类` : '未聚类数据'
     groups[name] = groups[name] || []
     const x = item.pca1 ?? item.petal_length
@@ -204,6 +212,7 @@ function renderChart() {
     data: groups[name],
   }))
   chart.setOption({
+    // color 控制各类颜色；legend 控制图例；grid 控制绘图区边距；series 控制散点与中心点。
     backgroundColor: '#ffffff',
     color: hasClusterResult
       ? ['#2563eb', '#f97316', '#16a34a', '#9333ea', '#dc2626', '#0891b2', '#ca8a04', '#db2777']
@@ -284,6 +293,7 @@ async function analyze() {
   }
   // 聚类本身由后端完成；前端负责接收聚类标签和中心点并重绘图表。
   const response = await runClustering(k.value)
+  // 后端返回的 rows 会带 cluster 字段，centers 用于绘制菱形中心点。
   rows.value = response.data.rows
   centers.value = response.data.centers || []
   await nextTick()

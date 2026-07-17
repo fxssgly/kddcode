@@ -2,6 +2,11 @@
   文件作用：通用数据表组件。
   项目位置：前端 components 层，被聚类和分类页面复用。
   交互关系：父页面把 rows 和显示开关传进来，本组件根据实际字段动态生成 Element Plus 表格列。
+
+  逐词注释：
+  el-card 是卡片容器；el-table 是表格；el-table-column 是列。
+  v-for 表示循环渲染；v-if 表示条件渲染；:prop 是动态绑定字段名；#default 是自定义单元格内容。
+  props 表示父组件传入的数据；computed 表示会随依赖自动更新的计算值。
 -->
 <template>
   <el-card shadow="never" class="work-card">
@@ -12,6 +17,7 @@
       </div>
     </template>
 
+    <!-- :data 绑定表格数据；height 固定表格高度；border 显示边框；size 控制紧凑程度。 -->
     <el-table :data="rows" height="360" border size="small">
       <!-- 普通数据列由 columns 动态生成，这样上传 CSV 字段变化时表格也能适配。 -->
       <el-table-column
@@ -71,6 +77,7 @@ const preferredOrder = [
 const hiddenResultFields = computed(() => {
   // 聚类/预测字段已经有专门的结果列，动态普通列中需要隐藏它们，防止重复展示。
   const fields = new Set()
+  // Set 用来保存需要隐藏的字段名，has 判断速度快且不会重复。
   if (props.showCluster) fields.add('cluster')
   if (props.showPredicted) fields.add('predicted')
   return fields
@@ -80,6 +87,7 @@ const columns = computed(() => {
   // 收集 rows 中实际出现过的字段；上传文件字段不固定，所以不能写死列。
   const keys = []
   props.rows.forEach((row) => {
+    // Object.keys 取出当前行对象的所有字段名。
     Object.keys(row || {}).forEach((key) => {
       if (!hiddenResultFields.value.has(key) && !keys.includes(key)) {
         keys.push(key)
@@ -89,6 +97,7 @@ const columns = computed(() => {
 
   // 已知字段按 preferredOrder 排在前面，其它字段跟在后面。
   keys.sort((left, right) => {
+    // sort 的返回值小于 0 时 left 排在前面，大于 0 时 right 排在前面。
     const leftIndex = preferredOrder.indexOf(left)
     const rightIndex = preferredOrder.indexOf(right)
     if (leftIndex !== -1 || rightIndex !== -1) {

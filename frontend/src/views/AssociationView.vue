@@ -2,6 +2,11 @@
   文件作用：关联规则实验页面，展示事务数据、参数控件、规则表和热力图。
   项目位置：前端 views 层，对应后端 AssociationController 和 DatasetController。
   交互关系：载入/上传数据走数据集接口，点击分析走 /api/association，结果用 ECharts 渲染。
+
+  逐词注释：
+  minSupport 是最小支持度；minConfidence 是最小置信度；transactions 是事务数据。
+  computed 自动计算表格行和二项规则；nextTick 等 DOM 更新完成；ref 保存响应式数据和图表 DOM。
+  echarts.init 创建图表实例；setOption 写入图表配置；series 表示图表数据系列。
 -->
 <template>
   <section class="page">
@@ -10,6 +15,7 @@
       <span>Apriori 规则与热力图</span>
     </div>
 
+    <!-- 工具栏卡片：集中放置数据载入、CSV 上传和算法阈值。 -->
     <el-card shadow="never" class="toolbar-card">
       <el-form inline label-width="86px">
         <el-form-item label="数据操作">
@@ -19,6 +25,7 @@
           </el-upload>
         </el-form-item>
         <el-form-item label="支持度">
+          <!-- v-model 双向绑定支持度；min/max/step 限制输入范围和步长。 -->
           <el-input-number v-model="minSupport" :min="0.05" :max="1" :step="0.05" />
         </el-form-item>
         <el-form-item label="置信度">
@@ -53,6 +60,7 @@
             </el-tag>
           </div>
         </template>
+        <!-- ref="chartRef" 用来在脚本中拿到这个 DOM 节点并交给 ECharts。 -->
         <div ref="chartRef" class="chart association-chart"></div>
       </el-card>
     </div>
@@ -85,13 +93,13 @@ import * as echarts from 'echarts'
 import { ElMessage } from 'element-plus'
 import { fetchTransactions, runAssociation, uploadTransactions } from '../api/request'
 
-const transactions = ref([])
-const rules = ref([])
-const frequentPairs = ref([])
-const minSupport = ref(0.2)
-const minConfidence = ref(0.6)
-const chartRef = ref(null)
-let chart = null
+const transactions = ref([]) // 原始事务数组，每条事务是一个商品项数组。
+const rules = ref([]) // 后端返回的关联规则列表。
+const frequentPairs = ref([]) // 后端返回的二项频繁项集/二项指标。
+const minSupport = ref(0.2) // 最小支持度，默认 0.2。
+const minConfidence = ref(0.6) // 最小置信度，默认 0.6。
+const chartRef = ref(null) // 热力图 DOM 引用。
+let chart = null // ECharts 实例缓存，避免重复初始化。
 
 // 把后端返回的二维数组事务转换成表格行，TID 从 101 开始用于贴近样例数据。
 const transactionRows = computed(() => transactions.value.map((items, index) => ({
@@ -117,6 +125,7 @@ function buildHeatmap() {
   // 构造 ECharts heatmap 数据：[xIndex, yIndex, confidence, pair, rule]。
   // pair/rule 作为附加数据放进去，tooltip 中可以直接读取支持度、提升度等信息。
   const items = heatmapItems.value
+  // indexMap 把商品名称映射成坐标轴下标，热力图数据必须使用数字坐标。
   const indexMap = Object.fromEntries(items.map((item, index) => [item, index]))
   const itemCounts = new Map()
 
@@ -139,6 +148,7 @@ function buildHeatmap() {
   const data = []
   items.forEach((left) => {
     items.forEach((right) => {
+      // left 是规则前项，right 是规则后项；相同商品不构成关联规则。
       const pair = left === right ? null : pairMap.get(`${left}\u0000${right}`)
       const rule = twoItemRules.value.find((item) => item.left[0] === left && item.right[0] === right)
       const value = pair ? pair.count / Math.max(1, itemCounts.get(left) || 0) : 0
@@ -157,6 +167,7 @@ function renderChart() {
   const { items, data } = buildHeatmap()
   chart.clear()
   chart.setOption({
+    // tooltip/grid/xAxis/yAxis/visualMap/series 分别控制提示框、绘图区、坐标轴、颜色映射和热力图主体。
     backgroundColor: '#ffffff',
     tooltip: {
       position: 'top',
@@ -260,6 +271,7 @@ async function analyze() {
   }
   // 提交阈值参数后，后端根据当前事务数据重新计算关联规则。
   const response = await runAssociation(minSupport.value, minConfidence.value)
+  // 后端返回的数据覆盖当前页面状态，确保表格和热力图展示同一轮分析结果。
   transactions.value = response.data.transactions
   rules.value = response.data.rules
   frequentPairs.value = response.data.pair_metrics || response.data.frequent_pairs || []

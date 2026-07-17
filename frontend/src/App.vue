@@ -2,9 +2,15 @@
   文件作用：定义前端应用的整体外壳，包括侧边栏、顶部栏、主内容区和作者弹窗。
   项目位置：Vue 根组件，所有实验页面都会在它的 RouterView 中显示。
   交互关系：依赖 vue-router 切换页面，依赖 auth.js 完成退出登录，子页面通过路由被嵌入主内容区。
+
+  逐词注释：
+  template 是页面结构；script setup 是组合式脚本；style 是样式。
+  RouterView 是路由出口；v-if/v-else 控制登录页和主框架二选一；class 指定 CSS 类名。
+  el-container/el-aside/el-header/el-main 来自 Element Plus，用来搭页面骨架。
 -->
 <template>
   <!-- 登录页单独渲染，不使用后台主框架，这样登录界面可以居中显示。 -->
+  <!-- $route.path 是当前 URL 路径；等于 /login 时只显示登录页。 -->
   <RouterView v-if="$route.path === '/login'" />
   <el-container v-else class="app-shell">
     <el-aside width="248px" class="sidebar">
@@ -17,6 +23,7 @@
       </div>
 
       <!-- router 属性让菜单项点击后直接跳转到对应路由，default-active 用当前地址高亮菜单。 -->
+      <!-- router 开启菜单路由跳转；index 与路由 path 对应；default-active 控制当前高亮项。 -->
       <el-menu router :default-active="$route.path" class="side-menu">
         <el-menu-item index="/association">关联规则</el-menu-item>
         <el-menu-item index="/clustering">聚类分析</el-menu-item>
@@ -46,6 +53,7 @@
     </el-container>
 
     <!-- 小组成员弹窗，数据来自 script 中的 authors 数组。 -->
+    <!-- v-model 把弹窗显示状态绑定到 authorDialogVisible。 -->
     <el-dialog v-model="authorDialogVisible" title="小组成员" width="420px">
       <el-table :data="authors" border>
         <el-table-column prop="name" label="姓名" />
@@ -60,7 +68,7 @@ import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { logout as clearLogin } from './auth'
 
-const router = useRouter()
+const router = useRouter() // 获取路由实例，用于退出登录后跳转到 /login。
 
 // 控制“联系作者”弹窗是否显示。
 const authorDialogVisible = ref(false)
