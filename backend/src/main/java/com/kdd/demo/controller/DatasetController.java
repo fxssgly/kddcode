@@ -39,7 +39,7 @@ public class DatasetController {
     /**
      * 返回用于聚类或分类的 Iris 数据行。
      *
-     * dataset=classification 时读取 iris2.csv，否则返回聚类数据集。
+     * dataset=classification 时返回分类数据集，否则返回聚类数据集。
      * 响应结构保持一致：total + rows。
      */
     @GetMapping({"/api/iris", "/api/datasets/iris"})
@@ -57,8 +57,7 @@ public class DatasetController {
     }
 
     /**
-     * 上传 Iris CSV 文件，并把解析后的数据保存在当前后端进程内存中，
-     * 后续会优先使用上传数据，而不是内置 CSV 或 MySQL 数据源。
+     * 上传 Iris CSV 文件；启用 MySQL 时会写入 iris 表，数据库不可用时才临时保存在内存中。
      */
     @PostMapping({"/api/iris/upload", "/api/datasets/iris/upload"})
     public Map<String, Object> uploadIris(@RequestParam("file") MultipartFile file) throws IOException {
@@ -82,7 +81,7 @@ public class DatasetController {
     }
 
     /**
-     * 从后端 data 目录返回默认的回归样例数据。
+     * 返回默认的回归样例数据；启用 MySQL 时优先读取 regression_data 表。
      */
     @GetMapping({"/api/regression/data", "/api/datasets/regression"})
     public Map<String, Object> regression() {
@@ -106,7 +105,7 @@ public class DatasetController {
     }
 
     /**
-     * 上传事务 CSV。如果上传文件看起来像 Iris 数据，
+     * 上传事务 CSV 并写入 transaction_items 表。如果上传文件看起来像 Iris 数据，
      * 服务层会把每一行转换成离散化的事务项。
      */
     @PostMapping({"/api/transactions/upload", "/api/datasets/transactions/upload"})

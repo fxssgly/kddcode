@@ -6,8 +6,10 @@ package com.kdd.demo.service;
  * 交互关系：DatasetController 用它返回表格数据；AlgorithmService 用它把数据送进 Python 算法。
  */
 import com.kdd.demo.entity.IrisSample;
+import com.kdd.demo.entity.RegressionSample;
 import com.kdd.demo.entity.TransactionItem;
 import com.kdd.demo.repository.IrisRepository;
+import com.kdd.demo.repository.RegressionRepository;
 import com.kdd.demo.repository.TransactionItemRepository;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -31,23 +33,25 @@ import java.util.stream.Collectors;
 @Service
 public class DatasetService {
     private final IrisRepository irisRepository;
+    private final RegressionRepository regressionRepository;
     private final TransactionItemRepository transactionRepository;
     private final boolean useMysql;
     private final Charset gbk = Charset.forName("GBK");
 
     /*
-     * 上传的数据只保存在当前后端进程的内存中。
-     * 这样课堂演示更简单：上传后会立刻影响后续算法调用，
-     * 同时不需要额外实现数据库写入逻辑。
+     * 上传的数据在启用 MySQL 时会写入数据库。
+     * 数据库不可用时才临时保存在当前后端进程的内存中，保证课堂演示不中断。
      */
     private List<Map<String, Object>> uploadedIrisRows;
     private List<List<String>> uploadedTransactions;
 
     public DatasetService(
             IrisRepository irisRepository,
+            RegressionRepository regressionRepository,
             TransactionItemRepository transactionRepository,
-            @Value("${kdd.use-mysql:false}") boolean useMysql) {
+            @Value("${kdd.use-mysql:true}") boolean useMysql) {
         this.irisRepository = irisRepository;
+        this.regressionRepository = regressionRepository;
         this.transactionRepository = transactionRepository;
         this.useMysql = useMysql;
     }
@@ -70,6 +74,18 @@ public class DatasetService {
      * 返回默认的回归样例数据行。
      */
     public List<Map<String, Object>> getRegressionRows() {
+        if (useMysql) {
+            try {
+                List<RegressionSample> samples = regressionRepository.findAllByOrderByIdAsc();
+                if (!samples.isEmpty()) {
+                    return samples.stream()
+                            .map(this::toRegressionMap)
+                            .collect(Collectors.toList());
+                }
+            } catch (RuntimeException ignored) {
+                // MySQL is optional for classroom demos; fall back to CSV when unavailable.
+            }
+        }
         return readRegressionCsv(Paths.get("data", "regression_experiment.csv"));
     }
 
@@ -126,7 +142,24 @@ public class DatasetService {
      * 解析并保存上传的 Iris 数据，供后续聚类或分类使用。
      */
     public List<Map<String, Object>> uploadIris(MultipartFile file) throws IOException {
-        uploadedIrisRows = parseIris(file);
+        List<Map<String, Object>> rows = parseIris(file);
+        if (useMysql) {
+            try {
+                List<IrisSample> samples = rows.stream()
+                        .map(this::toIrisSample)
+                        .collect(Collectors.toList());
+                irisRepository.deleteAll();
+                irisRepository.saveAll(samples);
+                uploadedIrisRows = null;
+                return samples.stream()
+                        .sorted(Comparator.comparing(IrisSample::getId))
+                        .map(this::toIrisMap)
+                        .collect(Collectors.toList());
+            } catch (RuntimeException ignored) {
+                // MySQL is optional for classroom demos; keep uploaded data in memory when unavailable.
+            }
+        }
+        uploadedIrisRows = rows;
         return uploadedIrisRows;
     }
 
@@ -134,16 +167,51 @@ public class DatasetService {
      * 解析并保存上传的事务篮子，供后续关联规则挖掘使用。
      */
     public List<List<String>> uploadTransactions(MultipartFile file) throws IOException {
-        uploadedTransactions = parseTransactions(file);
+        List<List<String>> transactions = parseTransactions(file);
+        if (useMysql) {
+            try {
+                List<TransactionItem> rows = new ArrayList<>();
+                for (int transactionIndex = 0; transactionIndex < transactions.size(); transactionIndex++) {
+                    for (String item : transactions.get(transactionIndex)) {
+                        TransactionItem row = new TransactionItem();
+                        row.setTransactionId(transactionIndex + 1);
+                        row.setItemName(item);
+                        rows.add(row);
+                    }
+                }
+                transactionRepository.deleteAll();
+                transactionRepository.saveAll(rows);
+                uploadedTransactions = null;
+                return getTransactions();
+            } catch (RuntimeException ignored) {
+                // MySQL is optional for classroom demos; keep uploaded data in memory when unavailable.
+            }
+        }
+        uploadedTransactions = transactions;
         return uploadedTransactions;
     }
 
     /**
-     * 解析上传的回归数据，但不保存为全局状态；
-     * 调用方可以把返回的 rows 直接传给回归接口。
+     * 解析上传的回归数据；启用 MySQL 时会写入 regression_data 表。
      */
     public List<Map<String, Object>> uploadRegression(MultipartFile file) throws IOException {
-        return parseRegressionLines(readTextLines(file.getBytes()));
+        List<Map<String, Object>> rows = parseRegressionLines(readTextLines(file.getBytes()));
+        if (useMysql) {
+            try {
+                List<RegressionSample> samples = rows.stream()
+                        .map(this::toRegressionSample)
+                        .collect(Collectors.toList());
+                regressionRepository.deleteAll();
+                regressionRepository.saveAll(samples);
+                return samples.stream()
+                        .sorted(Comparator.comparing(RegressionSample::getId))
+                        .map(this::toRegressionMap)
+                        .collect(Collectors.toList());
+            } catch (RuntimeException ignored) {
+                // MySQL is optional for classroom demos; return parsed rows when unavailable.
+            }
+        }
+        return rows;
     }
 
     /**
@@ -158,6 +226,35 @@ public class DatasetService {
         row.put("petal_width", sample.getPetalWidth());
         row.put("species", sample.getSpecies());
         return row;
+    }
+
+    private IrisSample toIrisSample(Map<String, Object> row) {
+        IrisSample sample = new IrisSample();
+        sample.setId(((Number) row.get("id")).intValue());
+        sample.setSepalLength(((Number) row.get("sepal_length")).doubleValue());
+        sample.setSepalWidth(((Number) row.get("sepal_width")).doubleValue());
+        sample.setPetalLength(((Number) row.get("petal_length")).doubleValue());
+        sample.setPetalWidth(((Number) row.get("petal_width")).doubleValue());
+        sample.setSpecies(String.valueOf(row.get("species")));
+        return sample;
+    }
+
+    private Map<String, Object> toRegressionMap(RegressionSample sample) {
+        Map<String, Object> row = new LinkedHashMap<>();
+        row.put("id", sample.getId());
+        row.put("x", sample.getX());
+        row.put("y", sample.getY());
+        row.put("type", repairText(sample.getType()));
+        return row;
+    }
+
+    private RegressionSample toRegressionSample(Map<String, Object> row) {
+        RegressionSample sample = new RegressionSample();
+        sample.setId(((Number) row.get("id")).intValue());
+        sample.setX(((Number) row.get("x")).doubleValue());
+        sample.setY(((Number) row.get("y")).doubleValue());
+        sample.setType(String.valueOf(row.get("type")));
+        return sample;
     }
 
     /**

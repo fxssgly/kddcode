@@ -7,6 +7,8 @@ package com.kdd.demo.entity;
  */
 import javax.persistence.Column;
 import javax.persistence.Entity;
+import javax.persistence.GeneratedValue;
+import javax.persistence.GenerationType;
 import javax.persistence.Id;
 import javax.persistence.Table;
 
@@ -20,6 +22,7 @@ public class TransactionItem {
      * 分组还原成 List<List<String>>，供关联规则挖掘使用。
      */
     @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @Column(name = "transaction_id")

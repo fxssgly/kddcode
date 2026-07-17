@@ -104,10 +104,12 @@ const twoItemRules = computed(() => (
   rules.value.filter((rule) => rule.left.length === 1 && rule.right.length === 1)
 ))
 
-// 从频繁二项集中收集所有商品项，并使用中文排序保证坐标轴顺序稳定。
+// 从当前事务数据中收集所有商品项，保证热力图横纵坐标覆盖全部商品。
 const heatmapItems = computed(() => {
   const itemSet = new Set()
-  frequentPairs.value.forEach((pair) => pair.items.forEach((item) => itemSet.add(item)))
+  transactions.value.forEach((itemsInTransaction) => {
+    itemsInTransaction.forEach((item) => itemSet.add(item))
+  })
   return Array.from(itemSet).sort((left, right) => left.localeCompare(right, 'zh-CN'))
 })
 
@@ -260,7 +262,7 @@ async function analyze() {
   const response = await runAssociation(minSupport.value, minConfidence.value)
   transactions.value = response.data.transactions
   rules.value = response.data.rules
-  frequentPairs.value = response.data.frequent_pairs || []
+  frequentPairs.value = response.data.pair_metrics || response.data.frequent_pairs || []
   await nextTick()
   renderChart()
   ElMessage.success('关联规则分析完成')
