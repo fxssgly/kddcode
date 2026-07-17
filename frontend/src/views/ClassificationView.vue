@@ -19,7 +19,7 @@
       <el-form inline label-width="92px">
         <!-- 分类实验的主要参数：树高度和叶子节点最小样本数。 -->
         <el-form-item label="数据操作">
-          <el-button type="primary" @click="loadData">载入数据</el-button>
+          <el-button type="primary" :icon="Refresh" @click="loadData">载入数据</el-button>
           <el-upload :show-file-list="false" accept=".csv" :before-upload="handleUpload">
             <el-button>上传 CSV</el-button>
           </el-upload>
@@ -31,7 +31,7 @@
           <el-input-number v-model="minLeaf" :min="1" :max="10" />
         </el-form-item>
         <el-form-item>
-          <el-button type="success" @click="analyze">CART 分类</el-button>
+          <el-button type="success" @click="analyze">分类分析</el-button>
         </el-form-item>
       </el-form>
     </el-card>
@@ -41,13 +41,17 @@
       <el-card shadow="never" class="work-card">
         <template #header>
           <div class="card-header">
-            <strong>决策树图（CART）</strong>
+            <strong>决策树图</strong>
             <el-tag type="success">准确率 {{ accuracyText }}</el-tag>
             <el-tag>Precision {{ precisionText }}</el-tag>
             <el-tag>Recall {{ recallText }}</el-tag>
             <el-tag>F1 {{ f1Text }}</el-tag>
           </div>
         </template>
+        <el-tabs v-model="activeTree" class="tree-tabs" @tab-change="handleTreeTabChange">
+          <el-tab-pane label="CART 决策树" name="cart" />
+          <el-tab-pane label="ID3 决策树" name="id3" />
+        </el-tabs>
         <div class="tree-scroll">
           <div ref="chartRef" class="chart tree-chart"></div>
         </div>
@@ -60,6 +64,7 @@
 import { nextTick, ref } from 'vue'
 import * as echarts from 'echarts'
 import { ElMessage } from 'element-plus'
+import { Refresh } from '@element-plus/icons-vue'
 import { fetchIris, runClassification, uploadIris } from '../api/request'
 import DataTable from './components/DataTable.vue'
 
@@ -74,6 +79,9 @@ const precisionText = ref('-') // 精确率展示文本。
 const recallText = ref('-') // 召回率展示文本。
 const f1Text = ref('-') // F1 值展示文本。
 const chartRef = ref(null) // 决策树图表 DOM 引用。
+const activeTree = ref('cart')
+const cartTree = ref(null)
+const id3Tree = ref(null)
 let chart = null // ECharts tree 实例。
 
 // 不同 Iris 类别对应的基础颜色，树节点会根据类别纯度做浅色混合。
@@ -145,23 +153,28 @@ function treeStats(node, depth = 0) {
   // 统计树深度和叶子数，用来动态设置画布大小，避免节点挤在一起。
   const children = node.children || []
   if (!children.length) {
-    return { depth, leaves: 1 }
+    return { depth, leaves: 1, levels: { [depth]: 1 } }
   }
   return children.reduce((stats, child) => {
     const childStats = treeStats(child, depth + 1)
+    Object.entries(childStats.levels).forEach(([level, count]) => {
+      stats.levels[level] = (stats.levels[level] || 0) + count
+    })
     return {
       depth: Math.max(stats.depth, childStats.depth),
       leaves: stats.leaves + childStats.leaves,
+      levels: stats.levels,
     }
-  }, { depth, leaves: 0 })
+  }, { depth, leaves: 0, levels: { [depth]: 1 } })
 }
 
 function renderTree(tree) {
   if (!chartRef.value || !tree) return
   const stats = treeStats(tree)
-  // 树越宽或越深，图表容器越大；外层 tree-scroll 负责滚动查看。
-  const chartWidth = Math.max(1180, stats.leaves * 240)
-  const chartHeight = Math.max(780, (stats.depth + 1) * 180)
+  const maxNodesInRow = Math.max(...Object.values(stats.levels))
+  // 横向间距比原始版本更紧凑，但仍大于节点宽度，避免同层节点重叠。
+  const chartWidth = Math.max(960, Math.max(stats.leaves, maxNodesInRow) * 180)
+  const chartHeight = Math.max(620, (stats.depth + 1) * 145)
   chartRef.value.style.width = `${chartWidth}px`
   chartRef.value.style.height = `${chartHeight}px`
 
@@ -180,11 +193,11 @@ function renderTree(tree) {
       orient: 'vertical',
       data: [decorateTree(tree)],
       top: '8%',
-      left: '6%',
-      bottom: '10%',
-      right: '6%',
+      left: '2%',
+      bottom: '8%',
+      right: '2%',
       symbol: 'rect',
-      symbolSize: [138, 78],
+      symbolSize: [126, 74],
       edgeShape: 'polyline',
       edgeForkPosition: '50%',
       initialTreeDepth: -1,
@@ -224,10 +237,18 @@ function renderTree(tree) {
 function clearTree() {
   // 重新载入数据后，旧树和旧指标都需要清空。
   if (chart) chart.clear()
+  cartTree.value = null
+  id3Tree.value = null
+  activeTree.value = 'cart'
   accuracyText.value = '-'
   precisionText.value = '-'
   recallText.value = '-'
   f1Text.value = '-'
+}
+
+async function handleTreeTabChange() {
+  await nextTick()
+  renderTree(activeTree.value === 'id3' ? id3Tree.value : cartTree.value)
 }
 
 async function loadData() {
@@ -260,9 +281,12 @@ async function analyze() {
   precisionText.value = Number(response.data.precision || 0).toFixed(3)
   recallText.value = Number(response.data.recall || 0).toFixed(3)
   f1Text.value = Number(response.data.f1 || 0).toFixed(3)
+  cartTree.value = response.data.tree
+  id3Tree.value = response.data.id3_tree || response.data.trees?.id3 || null
+  activeTree.value = 'cart'
   // 等表格和图表容器完成更新后再渲染决策树。
   await nextTick()
-  renderTree(response.data.tree)
+  renderTree(cartTree.value)
   ElMessage.success('分类分析完成')
 }
 </script>
@@ -276,6 +300,10 @@ async function analyze() {
 .classification-layout {
   display: grid;
   gap: 16px;
+}
+
+.tree-tabs {
+  margin-bottom: 8px;
 }
 
 .tree-scroll {

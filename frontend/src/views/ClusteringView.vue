@@ -12,23 +12,53 @@
   <section class="page">
     <div class="page-title">
       <strong>聚类分析</strong>
-      <span>K-Means</span>
+      <span>{{ currentMethodLabel }}</span>
     </div>
 
     <el-card shadow="never" class="toolbar-card">
       <el-form inline label-width="86px">
         <!-- 数据操作和算法参数放在同一行，方便实验时反复调整 k 值。 -->
         <el-form-item label="数据操作">
-          <el-button type="primary" @click="loadData">载入数据</el-button>
+          <el-button type="primary" :icon="Refresh" @click="loadData">载入数据</el-button>
           <el-upload :show-file-list="false" accept=".csv" :before-upload="handleUpload">
             <el-button>上传 CSV</el-button>
           </el-upload>
         </el-form-item>
-        <el-form-item label="聚类个数">
+        <el-form-item label="聚类方法">
+          <el-select v-model="method" class="method-select">
+            <el-option
+              v-for="item in methodOptions"
+              :key="item.value"
+              :label="item.label"
+              :value="item.value"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item v-if="needsClusterCount" label="聚类个数">
           <el-input-number v-model="k" :min="1" :max="8" />
         </el-form-item>
+        <el-form-item v-if="method === 'agglomerative'" label="连接方式">
+          <el-select v-model="linkage" class="small-select">
+            <el-option label="ward" value="ward" />
+            <el-option label="complete" value="complete" />
+            <el-option label="average" value="average" />
+            <el-option label="single" value="single" />
+          </el-select>
+        </el-form-item>
+        <el-form-item v-if="method === 'birch'" label="阈值">
+          <el-input-number v-model="threshold" :min="0.01" :max="2" :step="0.05" />
+        </el-form-item>
+        <el-form-item v-if="method === 'dbscan'" label="邻域半径">
+          <el-input-number v-model="eps" :min="0.01" :max="3" :step="0.05" />
+        </el-form-item>
+        <el-form-item v-if="method === 'dbscan'" label="最小样本">
+          <el-input-number v-model="minSamples" :min="1" :max="30" />
+        </el-form-item>
+        <el-form-item v-if="method === 'meanshift'" label="带宽">
+          <el-input-number v-model="bandwidth" :min="0" :max="5" :step="0.1" />
+        </el-form-item>
         <el-form-item>
-          <el-button type="success" @click="analyze">聚类分析</el-button>
+          <el-button type="success" :loading="analyzing" :disabled="analyzing" @click="analyze">聚类分析</el-button>
         </el-form-item>
       </el-form>
     </el-card>
@@ -39,7 +69,11 @@
         <template #header>
           <div class="card-header">
             <strong>聚类散点图</strong>
-            <el-tag>标准化后 PCA1 / PCA2</el-tag>
+            <div class="chart-tags">
+              <el-tag class="method-tag">{{ resultMethodLabel }} · 标准化后 PCA1 / PCA2</el-tag>
+              <el-tag class="count-tag" type="info">{{ resultClusterCount !== null ? `${resultClusterCount} 个簇` : '未生成簇' }}</el-tag>
+              <el-tag class="noise-tag" :type="resultNoiseCount ? 'warning' : 'info'">{{ resultNoiseCount ? `${resultNoiseCount} 个噪声点` : '无噪声点' }}</el-tag>
+            </div>
           </div>
         </template>
         <div ref="chartRef" class="chart scatter-chart"></div>
@@ -49,9 +83,10 @@
 </template>
 
 <script setup>
-import { nextTick, ref } from 'vue'
+import { computed, nextTick, ref } from 'vue'
 import * as echarts from 'echarts'
 import { ElMessage } from 'element-plus'
+import { Refresh } from '@element-plus/icons-vue'
 import { fetchIris, runClustering, uploadIris } from '../api/request'
 import DataTable from './components/DataTable.vue'
 
@@ -59,12 +94,37 @@ import DataTable from './components/DataTable.vue'
 const rows = ref([]) // 表格行和散点图点位共用的数据源。
 // centers 保存后端返回的聚类中心，用菱形标记叠加到散点图上。
 const centers = ref([]) // 聚类中心点，由后端计算后返回。
-const k = ref(3) // K-Means 的 k 值，默认分 3 类。
+const method = ref('kmeans') // 当前选择的聚类算法。
+const k = ref(3) // 需要预设类别数的算法默认分 3 类。
+const linkage = ref('ward') // 层次聚类的连接方式。
+const threshold = ref(0.2) // Birch 的阈值参数。
+const eps = ref(0.5) // DBSCAN 的邻域半径。
+const minSamples = ref(5) // DBSCAN 的最小样本数。
+const bandwidth = ref(1) // MeanShift 带宽；0 表示交给后端自动估计。
+const resultMethodLabel = ref('未聚类') // 后端实际执行的算法名称。
+const resultClusterCount = ref(null) // 后端实际得到的簇数量。
+const resultNoiseCount = ref(0) // DBSCAN 等算法可能产生噪声点。
+const analyzing = ref(false) // 聚类请求进行中时的页面状态。
 const chartRef = ref(null) // 散点图 DOM 引用。
 let chart = null // ECharts 散点图实例。
 
 // Iris 的 4 个数值特征，用于前端 PCA 降维展示。
 const featureNames = ['sepal_length', 'sepal_width', 'petal_length', 'petal_width']
+
+const methodOptions = [
+  { label: 'K-Means', value: 'kmeans' },
+  { label: 'AgglomerativeClustering', value: 'agglomerative' },
+  { label: 'Birch', value: 'birch' },
+  { label: 'DBSCAN', value: 'dbscan' },
+  { label: 'MeanShift', value: 'meanshift' },
+]
+
+const currentMethodLabel = computed(() => {
+  const selected = methodOptions.find((item) => item.value === method.value)
+  return selected ? selected.label : 'K-Means'
+})
+
+const needsClusterCount = computed(() => ['kmeans', 'agglomerative', 'birch'].includes(method.value))
 
 function scatterSize(count) {
   // 数据越多点越小，减少图表重叠。
@@ -180,6 +240,29 @@ function rowsWithPca(sourceRows) {
   })
 }
 
+function clusterName(cluster) {
+  const label = Number(cluster)
+  return label < 0 ? '噪声点' : `第 ${label + 1} 类`
+}
+
+function centerName(cluster) {
+  const label = Number(cluster)
+  return label < 0 ? '噪声' : `C${label + 1}`
+}
+
+function clusteringParams() {
+  return {
+    method: method.value,
+    rows: rows.value,
+    k: k.value,
+    linkage: linkage.value,
+    threshold: threshold.value,
+    eps: eps.value,
+    min_samples: minSamples.value,
+    bandwidth: bandwidth.value,
+  }
+}
+
 function renderChart() {
   if (!chartRef.value) return
   if (!chart) chart = echarts.init(chartRef.value)
@@ -189,7 +272,7 @@ function renderChart() {
   const groups = {}
   rows.value.forEach((item) => {
     // 已聚类时按 cluster 分组；未聚类时全部归到同一个系列。
-    const name = hasClusterResult ? `第 ${item.cluster + 1} 类` : '未聚类数据'
+    const name = hasClusterResult ? clusterName(item.cluster) : '未聚类数据'
     groups[name] = groups[name] || []
     const x = item.pca1 ?? item.petal_length
     const y = item.pca2 ?? item.petal_width
@@ -247,7 +330,7 @@ function renderChart() {
         label: {
           show: true,
           formatter(params) {
-            return `C${params.data[2] + 1}`
+            return centerName(params.data[2])
           },
           position: 'right',
           color: '#111827',
@@ -255,7 +338,7 @@ function renderChart() {
         },
         tooltip: {
           formatter(params) {
-            return `聚类中心 C${params.data[2] + 1}<br/>PCA1：${params.data[0]}<br/>PCA2：${params.data[1]}`
+            return `聚类中心 ${centerName(params.data[2])}<br/>PCA1：${params.data[0]}<br/>PCA2：${params.data[1]}`
           },
         },
         data: centers.value.map((item) => [item.pca1, item.pca2, item.cluster]),
@@ -270,6 +353,9 @@ async function loadData() {
   const response = await fetchIris('clustering')
   rows.value = rowsWithPca(response.data.rows)
   centers.value = []
+  resultMethodLabel.value = '未聚类'
+  resultClusterCount.value = null
+  resultNoiseCount.value = 0
   await nextTick()
   renderChart()
   ElMessage.success('默认数据已载入')
@@ -280,6 +366,9 @@ async function handleUpload(file) {
   const response = await uploadIris(file)
   rows.value = rowsWithPca(response.data.rows)
   centers.value = []
+  resultMethodLabel.value = '未聚类'
+  resultClusterCount.value = null
+  resultNoiseCount.value = 0
   await nextTick()
   renderChart()
   ElMessage.success('CSV 已上传')
@@ -291,14 +380,25 @@ async function analyze() {
     ElMessage.warning('请先载入数据')
     return
   }
-  // 聚类本身由后端完成；前端负责接收聚类标签和中心点并重绘图表。
-  const response = await runClustering(k.value)
-  // 后端返回的 rows 会带 cluster 字段，centers 用于绘制菱形中心点。
-  rows.value = response.data.rows
-  centers.value = response.data.centers || []
-  await nextTick()
-  renderChart()
-  ElMessage.success('聚类分析完成')
+  analyzing.value = true
+  try {
+    // 聚类本身由后端完成；前端负责接收聚类标签和中心点并重绘图表。
+    const response = await runClustering(clusteringParams())
+    // 后端返回的 rows 会带 cluster 字段，centers 用于绘制菱形中心点。
+    rows.value = response.data.rows
+    centers.value = response.data.centers || []
+    resultMethodLabel.value = response.data.methodName || currentMethodLabel.value
+    resultClusterCount.value = response.data.clusterCount ?? null
+    resultNoiseCount.value = response.data.noiseCount || 0
+    await nextTick()
+    renderChart()
+    ElMessage.success(`${resultMethodLabel.value} 聚类分析完成`)
+  } catch (error) {
+    const message = error.response?.data?.message || error.response?.data?.error || error.message || '聚类分析失败'
+    ElMessage.error(message)
+  } finally {
+    analyzing.value = false
+  }
 }
 </script>
 
@@ -317,5 +417,45 @@ async function analyze() {
   width: min(880px, 100%);
   height: 520px;
   margin: 0 auto;
+}
+
+.method-select {
+  width: 230px;
+}
+
+.small-select {
+  width: 130px;
+}
+
+.chart-tags {
+  display: grid;
+  grid-template-columns: 230px 86px 104px;
+  gap: 8px;
+  align-items: center;
+}
+
+.chart-tags .el-tag {
+  justify-content: center;
+  width: 100%;
+}
+
+.method-tag {
+  justify-content: flex-start !important;
+}
+
+@media (max-width: 720px) {
+  .card-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .chart-tags {
+    grid-template-columns: 1fr;
+    width: 100%;
+  }
+
+  .method-tag {
+    justify-content: center !important;
+  }
 }
 </style>

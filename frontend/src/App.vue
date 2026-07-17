@@ -39,6 +39,11 @@
           <h1>数据挖掘与分析综合实验平台</h1>
         </div>
         <div class="topbar-actions">
+          <div v-if="currentUser.username" class="current-user">
+            <el-icon class="current-user-icon"><UserFilled /></el-icon>
+            <span>当前用户</span>
+            <strong>{{ currentUser.username }}</strong>
+          </div>
           <!-- 弹窗开关由 authorDialogVisible 控制。 -->
           <el-button type="primary" @click="authorDialogVisible = true">
             联系作者
@@ -64,11 +69,19 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
-import { useRouter } from 'vue-router'
-import { logout as clearLogin } from './auth'
+import { computed, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { UserFilled } from '@element-plus/icons-vue'
+import { getCurrentUser, logout as clearLogin } from './auth'
 
 const router = useRouter() // 获取路由实例，用于退出登录后跳转到 /login。
+const route = useRoute() // 获取当前路由，用来在登录跳转后刷新顶部用户信息。
+
+// 当前登录用户信息来自 auth.js 中保存的本地登录态。
+const currentUser = computed(() => {
+  route.path
+  return getCurrentUser()
+})
 
 // 控制“联系作者”弹窗是否显示。
 const authorDialogVisible = ref(false)
@@ -201,6 +214,44 @@ body {
   display: flex;
   gap: 10px;
   align-items: center;
+}
+
+.current-user {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  min-height: 40px;
+  padding: 6px 12px;
+  border: 1px solid #dbe3ee;
+  border-radius: 8px;
+  background: #f8fafc;
+  color: #1f2937;
+}
+
+.current-user-icon {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border-radius: 50%;
+  background: #2a9d8f;
+  color: #fff;
+  font-size: 16px;
+}
+
+.current-user span {
+  color: #64748b;
+  font-size: 12px;
+}
+
+.current-user strong {
+  max-width: 140px;
+  overflow: hidden;
+  color: #111827;
+  font-size: 14px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .topbar-actions .el-button + .el-button {

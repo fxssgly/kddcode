@@ -5,7 +5,15 @@
 交互关系：读取 Java 写入的 JSON 请求，根据 operation 分发到 algorithms 包中的具体算法，再把结果 JSON 输出给 Java。
 """
 import json
+import os
 import sys
+import warnings
+
+# Keep stdout as clean JSON for the Java bridge. Some sklearn/joblib models emit
+# CPU-detection warnings on Windows when WMIC is unavailable; Java merges stderr
+# into the captured output, so those warnings would corrupt the JSON response.
+os.environ.setdefault("LOKY_MAX_CPU_COUNT", "1")
+warnings.filterwarnings("ignore", category=UserWarning, module=r"joblib\..*")
 
 from algorithms.association import association
 from algorithms.classification import classification

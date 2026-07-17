@@ -82,7 +82,7 @@ public class PythonAlgorithmService {
      * 其他算法只在 Python 中实现，因此失败时直接抛出错误。
      */
     private Map<String, Object> fallbackOrThrow(String operation, Map<String, Object> payload, String message, Exception cause) {
-        if ("clustering".equals(operation)) {
+        if ("clustering".equals(operation) && "kmeans".equalsIgnoreCase(String.valueOf(payload.getOrDefault("method", "kmeans")))) {
             return clusteringFallback(payload);
         }
         if (cause == null) {

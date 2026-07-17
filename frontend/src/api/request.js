@@ -117,9 +117,9 @@ export function runAssociation(minSupport, minConfidence) {
   })
 }
 
-// 提交聚类个数 k，后端返回带 cluster 标签的数据行和聚类中心。
-export function runClustering(k) {
-  return request.post('/api/clustering', { k })
+// 提交聚类算法和参数，后端返回带 cluster 标签的数据行和聚类中心。
+export function runClustering(params) {
+  return request.post('/api/clustering', params)
 }
 
 // 提交 CART 决策树参数，后端返回预测结果、树结构和评估指标。

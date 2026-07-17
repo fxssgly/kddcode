@@ -32,7 +32,8 @@
       <!-- 聚类结果单独展示为标签，避免和普通字段重复出现。 -->
       <el-table-column v-if="showCluster" label="聚类" width="90">
         <template #default="{ row }">
-          <el-tag v-if="row.cluster !== undefined" type="success">第 {{ row.cluster + 1 }} 类</el-tag>
+          <el-tag v-if="row.cluster !== undefined && row.cluster >= 0" type="success">第 {{ row.cluster + 1 }} 类</el-tag>
+          <el-tag v-else-if="row.cluster === -1" type="warning">噪声点</el-tag>
           <span v-else>-</span>
         </template>
       </el-table-column>

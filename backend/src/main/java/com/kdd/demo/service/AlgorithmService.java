@@ -36,12 +36,23 @@ public class AlgorithmService {
     }
 
     /**
-     * 在聚类用 Iris 数据集上执行 K-Means 聚类。
+     * 在聚类用 Iris 数据集上执行指定聚类算法。
      */
     public Map<String, Object> clustering(Map<String, Object> body) {
         Map<String, Object> payload = new HashMap<>();
-        payload.put("rows", datasetService.getClusteringIrisRows());
+        Object rows = body.get("rows");
+        if (rows instanceof List) {
+            payload.put("rows", rows);
+        } else {
+            payload.put("rows", datasetService.getClusteringIrisRows());
+        }
+        payload.put("method", string(body, "method", "kmeans"));
         payload.put("k", (int) number(body, "k", 3));
+        payload.put("eps", number(body, "eps", 0.5));
+        payload.put("min_samples", (int) number(body, "min_samples", 5));
+        payload.put("threshold", number(body, "threshold", 0.5));
+        payload.put("bandwidth", number(body, "bandwidth", 0));
+        payload.put("linkage", string(body, "linkage", "ward"));
         return pythonAlgorithmService.run("clustering", payload);
     }
 

@@ -8,6 +8,28 @@
 from algorithms.common import FEATURES, as_float, as_text
 
 
+def entropy(groups):
+    """计算候选划分的加权信息熵，用于 ID3 决策树。"""
+    import math
+
+    total = sum(len(group) for group in groups) or 1
+    score = 0.0
+    for group in groups:
+        if not group:
+            continue
+        counts = {}
+        for row in group:
+            species = row.get("species", "unknown")
+            counts[species] = counts.get(species, 0) + 1
+        group_score = 0.0
+        for count in counts.values():
+            ratio = count / float(len(group))
+            if ratio:
+                group_score -= ratio * math.log(ratio, 2)
+        score += group_score * (len(group) / float(total))
+    return score
+
+
 def gini(groups):
     """计算候选划分的加权基尼不纯度。"""
     total = sum(len(group) for group in groups) or 1
@@ -45,9 +67,16 @@ def class_counts(rows, class_names):
     return [counts.get(name, 0) for name in class_names]
 
 
-def node_impurity(rows):
+def split_score(groups, criterion):
+    """根据算法类型选择划分评价指标。"""
+    if criterion == "entropy":
+        return entropy(groups)
+    return gini(groups)
+
+
+def node_impurity(rows, criterion="gini"):
     """计算单个节点不纯度的便捷封装。"""
-    return gini([rows])
+    return split_score([rows], criterion)
 
 
 def node_payload(rows, class_names, name, depth, criterion="gini"):
@@ -57,7 +86,7 @@ def node_payload(rows, class_names, name, depth, criterion="gini"):
     return {
         "name": name,
         "criterion": criterion,
-        "impurity": round(node_impurity(rows), 3),
+        "impurity": round(node_impurity(rows, criterion), 3),
         "samples": len(rows),
         "value": counts,
         "className": class_name,
@@ -65,11 +94,11 @@ def node_payload(rows, class_names, name, depth, criterion="gini"):
     }
 
 
-def build_tree(rows, depth, max_depth, min_leaf, class_names):
+def build_tree(rows, depth, max_depth, min_leaf, class_names, criterion="gini"):
     """递归构建 CART 风格的二叉决策树。"""
     labels = set(row.get("species", "unknown") for row in rows)
     if depth >= max_depth or len(rows) <= min_leaf or len(labels) == 1:
-        return node_payload(rows, class_names, majority(rows), depth)
+        return node_payload(rows, class_names, majority(rows), depth, criterion)
 
     # 尝试每个特征阈值，并保留基尼不纯度最低的划分。
     best = None
@@ -80,7 +109,7 @@ def build_tree(rows, depth, max_depth, min_leaf, class_names):
             right = [row for row in rows if as_float(row.get(feature)) > threshold]
             if len(left) < min_leaf or len(right) < min_leaf:
                 continue
-            score = gini([left, right])
+            score = split_score([left, right], criterion)
             if best is None or score < best["score"]:
                 best = {
                     "feature": feature,
@@ -91,17 +120,17 @@ def build_tree(rows, depth, max_depth, min_leaf, class_names):
                 }
 
     if best is None:
-        return node_payload(rows, class_names, majority(rows), depth)
+        return node_payload(rows, class_names, majority(rows), depth, criterion)
 
     # 同时保存展示字段和机器可读字段，方便前端可视化。
     name = "%s <= %.2f" % (best["feature"], best["threshold"])
-    node = node_payload(rows, class_names, name, depth)
+    node = node_payload(rows, class_names, name, depth, criterion)
     node.update({
         "feature": best["feature"],
         "threshold": round(best["threshold"], 3),
         "children": [
-            build_tree(best["left"], depth + 1, max_depth, min_leaf, class_names),
-            build_tree(best["right"], depth + 1, max_depth, min_leaf, class_names),
+            build_tree(best["left"], depth + 1, max_depth, min_leaf, class_names, criterion),
+            build_tree(best["right"], depth + 1, max_depth, min_leaf, class_names, criterion),
         ],
     })
     return node
@@ -203,7 +232,8 @@ def classification(payload):
     min_leaf = int(as_float(payload.get("min_leaf"), 2))
     train_rows, test_rows = train_test_split_rows(rows)
     class_names = sorted(set(row.get("species", "unknown") for row in rows))
-    tree = build_tree(train_rows, 0, max_depth, min_leaf, class_names)
+    tree = build_tree(train_rows, 0, max_depth, min_leaf, class_names, "gini")
+    id3_tree = build_tree(train_rows, 0, max_depth, min_leaf, class_names, "entropy")
     for row in rows:
         predicted = predict_tree(tree, row)
         row["predicted"] = predicted
@@ -211,6 +241,11 @@ def classification(payload):
     return {
         "rows": rows,
         "tree": tree,
+        "id3_tree": id3_tree,
+        "trees": {
+            "cart": tree,
+            "id3": id3_tree,
+        },
         "accuracy": metrics["accuracy"],
         "precision": metrics["precision"],
         "recall": metrics["recall"],

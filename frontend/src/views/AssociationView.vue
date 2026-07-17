@@ -19,7 +19,7 @@
     <el-card shadow="never" class="toolbar-card">
       <el-form inline label-width="86px">
         <el-form-item label="数据操作">
-          <el-button type="primary" @click="loadData">载入数据</el-button>
+          <el-button type="primary" :icon="Refresh" @click="loadData">载入数据</el-button>
           <el-upload :show-file-list="false" accept=".csv" :before-upload="handleUpload">
             <el-button>上传 CSV</el-button>
           </el-upload>
@@ -91,6 +91,7 @@
 import { computed, nextTick, ref } from 'vue'
 import * as echarts from 'echarts'
 import { ElMessage } from 'element-plus'
+import { Refresh } from '@element-plus/icons-vue'
 import { fetchTransactions, runAssociation, uploadTransactions } from '../api/request'
 
 const transactions = ref([]) // 原始事务数组，每条事务是一个商品项数组。
