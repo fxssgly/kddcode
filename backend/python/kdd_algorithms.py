@@ -9,9 +9,8 @@ import os
 import sys
 import warnings
 
-# Keep stdout as clean JSON for the Java bridge. Some sklearn/joblib models emit
-# CPU-detection warnings on Windows when WMIC is unavailable; Java merges stderr
-# into the captured output, so those warnings would corrupt the JSON response.
+# Java 会把 Python 标准输出当作 JSON 读取；Windows 上 sklearn/joblib 的环境提示可能污染输出，
+# 所以这里先关闭这类无关警告，保证 stdout 只包含算法结果 JSON。
 os.environ.setdefault("LOKY_MAX_CPU_COUNT", "1")
 warnings.filterwarnings("ignore", category=UserWarning, module=r"joblib\..*")
 

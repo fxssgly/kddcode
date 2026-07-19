@@ -31,11 +31,9 @@ public class ClassificationController {
     }
 
     /**
-     * 基于 Iris 数据构建并评估一个小型决策树分类器。
-     *
-     * 请求体可以提供 max_depth 和 min_leaf，用来调整树的复杂度。
+     * 基于 Iris 数据构建并评估决策树分类器。
      */
-    @PostMapping({"/api/classification", "/api/analysis/classification"})
+    @PostMapping("/api/classification")
     public Map<String, Object> classification(@RequestBody Map<String, Object> body) {
         return algorithmService.classification(body);
     }

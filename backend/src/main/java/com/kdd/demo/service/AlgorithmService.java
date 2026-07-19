@@ -68,17 +68,11 @@ public class AlgorithmService {
     }
 
     /**
-     * 如果客户端提供了 rows，就使用客户端数据做回归；
-     * 否则回退到内置的回归样例 CSV。
+     * 使用固定回归样例数据执行回归分析。
      */
     public Map<String, Object> regression(Map<String, Object> body) {
         Map<String, Object> payload = new HashMap<>();
-        Object rows = body.get("rows");
-        if (rows instanceof List) {
-            payload.put("rows", rows);
-        } else {
-            payload.put("rows", datasetService.getRegressionRows());
-        }
+        payload.put("rows", datasetService.getRegressionRows());
         payload.put("x_field", string(body, "x_field", "x"));
         payload.put("y_field", string(body, "y_field", "y"));
         return pythonAlgorithmService.run("regression", payload);

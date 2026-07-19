@@ -31,11 +31,9 @@ public class RegressionController {
     }
 
     /**
-     * 对上传数据或默认数据执行线性、多项式和 RANSAC 回归。
-     *
-     * 请求体可以直接包含 rows，也可以通过 x_field/y_field 指定自定义列名。
+     * 对默认数据执行线性、多项式和 RANSAC 回归。
      */
-    @PostMapping({"/api/regression", "/api/analysis/regression"})
+    @PostMapping("/api/regression")
     public Map<String, Object> regression(@RequestBody Map<String, Object> body) {
         return algorithmService.regression(body);
     }

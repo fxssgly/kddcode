@@ -33,11 +33,8 @@ public class AssociationController {
 
     /**
      * 执行关联规则挖掘。
-     *
-     * 请求参数可包含 min_support 和 min_confidence。
-     * 这里保留两个访问路径，用来兼容不同版本的前端。
      */
-    @PostMapping({"/api/association", "/api/analysis/association"})
+    @PostMapping("/api/association")
     public Map<String, Object> association(@RequestBody Map<String, Object> body) {
         return algorithmService.association(body);
     }

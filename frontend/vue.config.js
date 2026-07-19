@@ -1,3 +1,5 @@
+// 文件作用：Vue CLI 项目配置，主要控制开发服务器地址、端口、错误遮罩和 /api 代理。
+// 关联文件：api/request.js 发出的 /api 请求会在开发环境经这里转发到后端服务。
 const { defineConfig } = require('@vue/cli-service')
 
 module.exports = defineConfig({

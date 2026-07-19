@@ -1,11 +1,13 @@
 @echo off
 setlocal
 
-REM Prefer the Anaconda Python 3 environment used by this project.
+REM 文件作用：构建后端前先检查 Python 3 和 scikit-learn，避免打包后运行算法失败。
+REM 优先使用本项目约定的 Anaconda Python。
 if not defined KDD_PYTHON if exist "E:\Develop\Anaconda\python.exe" (
   set "KDD_PYTHON=E:\Develop\Anaconda\python.exe"
 )
 
+REM 默认路径不可用时，再寻找系统里的 Python 3。
 if not defined KDD_PYTHON (
   for /f "usebackq delims=" %%P in (`py -3 -c "import sys; print(sys.executable)" 2^>nul`) do set "KDD_PYTHON=%%P"
 )

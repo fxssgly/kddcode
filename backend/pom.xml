@@ -22,19 +22,23 @@
     </properties>
 
     <dependencies>
+        <!-- Web 依赖：提供 Controller、REST 接口和内嵌 Tomcat。 -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
+        <!-- JPA 依赖：让 Repository 可以通过实体类访问 MySQL 表。 -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-jpa</artifactId>
         </dependency>
+        <!-- MySQL 驱动：Spring Boot 通过它连接 jdbc:mysql://127.0.0.1:3306/bigdata。 -->
         <dependency>
             <groupId>mysql</groupId>
             <artifactId>mysql-connector-java</artifactId>
             <version>8.0.33</version>
         </dependency>
+        <!-- 测试依赖：用于后端接口和 Spring 上下文测试，不会打进生产运行包。 -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
@@ -44,6 +48,7 @@
 
     <build>
         <plugins>
+            <!-- Spring Boot Maven 插件：支持 mvn spring-boot:run 和打可执行 jar。 -->
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>

@@ -32,11 +32,9 @@ public class ClusteringController {
     }
 
     /**
-     * 对 Iris 的数值特征执行 K-Means 聚类。
-     *
-     * 请求体可以提供 k；未提供时默认使用 3 个簇。
+     * 对 Iris 的数值特征执行聚类。
      */
-    @PostMapping({"/api/clustering", "/api/analysis/clustering"})
+    @PostMapping("/api/clustering")
     public Map<String, Object> clustering(@RequestBody Map<String, Object> body) {
         return algorithmService.clustering(body);
     }

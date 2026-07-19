@@ -302,27 +302,25 @@ async function loadData() {
   }
 }
 
-async function analyzeRows(rows, message) {
-  // 把当前数据提交给后端，由后端完成线性、多项式和 RANSAC 回归。
+async function analyzeRows(message) {
+  // 回归实验使用后端固定数据集，前端只负责触发分析并展示结果。
   loading.value = true
   try {
-    const response = await runRegression('x', 'y', rows)
+    const response = await runRegression()
     await applyResult(response, message)
   } catch (error) {
-    ElMessage.error(error.response?.data?.message || 'CSV 分析失败，请检查字段是否包含 x 和 y')
+    ElMessage.error(error.response?.data?.message || '回归分析失败，请检查后端服务')
   } finally {
     loading.value = false
   }
 }
 
 async function startRegression() {
-  // 优先使用刚载入的原始 CSV；如果页面已经有点数据，也允许直接分析 points。
-  const rows = rawRows.value.length ? rawRows.value : points.value
-  if (!rows.length) {
+  if (!rawRows.value.length && !points.value.length) {
     ElMessage.warning('请先载入数据')
     return
   }
-  await analyzeRows(rows, '回归分析完成')
+  await analyzeRows('回归分析完成')
 }
 </script>
 

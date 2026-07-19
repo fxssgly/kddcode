@@ -1,28 +1,20 @@
 <!--
-  文件作用：定义前端应用的整体外壳，包括侧边栏、顶部栏、主内容区和作者弹窗。
-  项目位置：Vue 根组件，所有实验页面都会在它的 RouterView 中显示。
-  交互关系：依赖 vue-router 切换页面，依赖 auth.js 完成退出登录，子页面通过路由被嵌入主内容区。
-
-  逐词注释：
-  template 是页面结构；script setup 是组合式脚本；style 是样式。
-  RouterView 是路由出口；v-if/v-else 控制登录页和主框架二选一；class 指定 CSS 类名。
-  el-container/el-aside/el-header/el-main 来自 Element Plus，用来搭页面骨架。
+  文件作用：App.vue 是根组件，属于应用外壳层。
+  它负责区分登录页和系统主界面：/login 只渲染登录页面，其它路由渲染侧边栏、顶部栏和内容区。
+  关联文件：main.js 把它挂载为根组件；router/index.js 提供 $route 和 RouterView；auth.js 提供当前用户和退出登录逻辑。
 -->
 <template>
-  <!-- 登录页单独渲染，不使用后台主框架，这样登录界面可以居中显示。 -->
-  <!-- $route.path 是当前 URL 路径；等于 /login 时只显示登录页。 -->
+  <!-- RouterView = 路由出口；当前地址匹配哪个页面组件，这里就渲染哪个组件。 -->
   <RouterView v-if="$route.path === '/login'" />
   <el-container v-else class="app-shell">
     <el-aside width="248px" class="sidebar">
       <div class="brand">
         <div>
-          <!-- 系统品牌区：固定展示课程/实验平台名称。 -->
           <strong>数据挖掘综合实验</strong>
         </div>
       </div>
 
-      <!-- router 属性让菜单项点击后直接跳转到对应路由，default-active 用当前地址高亮菜单。 -->
-      <!-- router 开启菜单路由跳转；index 与路由 path 对应；default-active 控制当前高亮项。 -->
+      <!-- router 属性让 el-menu-item 的 index 变成路由地址；点击菜单会直接切换页面。 -->
       <el-menu router :default-active="$route.path" class="side-menu">
         <el-menu-item index="/association">关联规则</el-menu-item>
         <el-menu-item index="/clustering">聚类分析</el-menu-item>
@@ -38,12 +30,13 @@
           <h1>数据挖掘与分析综合实验平台</h1>
         </div>
         <div class="topbar-actions">
+          <!-- v-if 根据当前用户是否存在决定是否显示用户名，避免未登录时渲染空用户信息。 -->
           <div v-if="currentUser.username" class="current-user">
             <el-icon class="current-user-icon"><UserFilled /></el-icon>
             <span>当前用户</span>
             <strong>{{ currentUser.username }}</strong>
           </div>
-          <!-- 弹窗开关由 authorDialogVisible 控制。 -->
+          <!-- @click 绑定点击事件；这里直接修改 ref 变量，弹窗会因为 v-model 自动打开。 -->
           <el-button type="primary" @click="authorDialogVisible = true">
             联系作者
           </el-button>
@@ -51,13 +44,11 @@
         </div>
       </el-header>
       <el-main class="content">
-        <!-- 主内容区域：根据当前路由渲染关联、聚类、分类或回归页面。 -->
         <RouterView />
       </el-main>
     </el-container>
 
-    <!-- 小组成员弹窗，数据来自 script 中的 authors 数组。 -->
-    <!-- v-model 把弹窗显示状态绑定到 authorDialogVisible。 -->
+    <!-- v-model 双向绑定弹窗显示状态：按钮把它改成 true，关闭弹窗时 Element Plus 会改回 false。 -->
     <el-dialog v-model="authorDialogVisible" title="小组成员" width="420px">
       <el-table :data="authors" border>
         <el-table-column prop="name" label="姓名" />
@@ -68,32 +59,35 @@
 </template>
 
 <script setup>
+// script setup 是 Vue3 单文件组件语法，里面声明的变量和函数可以直接给 template 使用。
 import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { UserFilled } from '@element-plus/icons-vue'
 import { getCurrentUser, logout as clearLogin } from './auth'
 
-const router = useRouter() // 获取路由实例，用于退出登录后跳转到 /login。
-const route = useRoute() // 获取当前路由，用来在登录跳转后刷新顶部用户信息。
+// router 用来主动跳转页面；route 用来读取当前页面地址。
+const router = useRouter()
+const route = useRoute()
 
-// 当前登录用户信息来自 auth.js 中保存的本地登录态。
+// currentUser 使用 computed，是为了在路由变化时重新从 localStorage 读取登录用户。
+// route.path 这一行虽然不参与返回值，但会让 computed 依赖当前路由，从而在跳转后重新计算。
 const currentUser = computed(() => {
   route.path
   return getCurrentUser()
 })
 
-// 控制“联系作者”弹窗是否显示。
+// ref 创建响应式布尔值，控制“联系作者”弹窗的打开和关闭。
 const authorDialogVisible = ref(false)
 
-// 小组成员信息集中放在数组中，方便表格直接渲染。
+// authors 是固定展示数据，不需要响应式；模板中的表格直接读取这个数组。
 const authors = [
   { name: '顾林奕', studentId: '038123011' },
   { name: '张秋彤', studentId: '028123236' },
   { name: '张晨琳', studentId: '028123173' },
 ]
 
+// 退出流程：清除本地登录态 → 跳转回 /login；路由守卫会继续阻止未登录用户进入实验页。
 function logout() {
-  // 先清除本地登录态，再跳转回登录页。
   clearLogin()
   router.push('/login')
 }

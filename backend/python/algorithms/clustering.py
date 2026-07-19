@@ -1,5 +1,9 @@
 # -*- coding: utf-8 -*-
-"""Clustering algorithms used by the clustering analysis page."""
+"""文件作用：实现聚类分析页面使用的多种聚类算法。
+
+项目位置：backend/python/algorithms 算法模块之一，对应前端 ClusteringView.vue。
+交互关系：Java 传入 Iris 行数据和 method/k/eps 等参数，本模块返回带 cluster、pca1、pca2 的行数据给前端画散点图。
+"""
 import math
 
 from algorithms.common import FEATURES, as_float
@@ -15,12 +19,12 @@ METHOD_NAMES = {
 
 
 def feature_matrix(rows):
-    """Extract Iris numeric features from rows."""
+    """从 Iris 行数据中提取四个数值特征，作为聚类模型的输入矩阵。"""
     return [[as_float(row.get(name)) for name in FEATURES] for row in rows]
 
 
 def manual_standardize(matrix):
-    """Small dependency-free scaler used only if sklearn is unavailable."""
+    """无 sklearn 时使用的简化标准化逻辑，避免不同量纲影响距离计算。"""
     if not matrix:
         return []
     count = float(len(matrix))
@@ -34,6 +38,7 @@ def manual_standardize(matrix):
 
 
 def covariance_matrix(matrix):
+    """计算协方差矩阵；手写 PCA 需要用它找主成分方向。"""
     if not matrix:
         return [], []
     count = float(len(matrix))
@@ -51,14 +56,17 @@ def covariance_matrix(matrix):
 
 
 def mat_vec(matrix, vector):
+    """矩阵乘向量，是幂迭代求特征向量的基础操作。"""
     return [sum(value * vector[index] for index, value in enumerate(row)) for row in matrix]
 
 
 def vec_norm(vector):
+    """计算向量长度；返回 1.0 可以避免空向量或零向量导致除零。"""
     return math.sqrt(sum(value * value for value in vector)) or 1.0
 
 
 def power_iteration(matrix, iterations=80, initial=None):
+    """用幂迭代近似求协方差矩阵的最大特征向量。"""
     vector = list(initial) if initial else [1.0 for _ in matrix]
     vector = [value / vec_norm(vector) for value in vector]
     for _ in range(iterations):
@@ -72,7 +80,7 @@ def power_iteration(matrix, iterations=80, initial=None):
 
 
 def manual_pca(matrix):
-    """Small PCA implementation kept for the Java fallback path compatibility."""
+    """无 sklearn 时使用的简化 PCA，把四维 Iris 特征降成二维坐标。"""
     covariance, centered = covariance_matrix(matrix)
     if not covariance:
         return []
@@ -95,6 +103,7 @@ def manual_pca(matrix):
 
 
 def normalized_method(value):
+    """把前端传来的算法名称归一化，兼容大小写、横线和常见别名。"""
     method = str(value or "kmeans").lower().replace("-", "").replace("_", "")
     aliases = {
         "kmeans": "kmeans",
@@ -110,10 +119,12 @@ def normalized_method(value):
 
 
 def cluster_count(payload, rows):
+    """限制聚类个数范围，避免 k 小于 1 或大于样本数。"""
     return max(1, min(int(as_float(payload.get("k"), 3)), len(rows)))
 
 
 def build_model(method, payload, rows):
+    """根据 method 构造对应的 sklearn 聚类模型，并读取该模型需要的参数。"""
     from sklearn.cluster import AgglomerativeClustering, Birch, DBSCAN, KMeans, MeanShift
 
     if method == "kmeans":
@@ -135,12 +146,14 @@ def build_model(method, payload, rows):
 
 
 def fit_predict(method, payload, matrix, rows):
+    """训练聚类模型并返回每个样本的类别标签。"""
     model = build_model(method, payload, rows)
     labels = model.fit_predict(matrix) if hasattr(model, "fit_predict") else model.fit(matrix).labels_
     return model, [int(label) for label in labels]
 
 
 def pca_coordinates(matrix):
+    """使用 sklearn PCA 生成前端散点图需要的二维坐标。"""
     from sklearn.decomposition import PCA
 
     if len(matrix) == 0:
@@ -150,10 +163,12 @@ def pca_coordinates(matrix):
 
 
 def label_sort_key(label):
+    """排序时把噪声类放到普通类别之后。"""
     return (label < 0, label)
 
 
 def center_rows(rows):
+    """按聚类标签计算每一类在 PCA 图上的中心点。"""
     groups = {}
     for row in rows:
         label = int(row.get("cluster", 0))
@@ -172,6 +187,7 @@ def center_rows(rows):
 
 
 def sklearn_clustering(payload):
+    """优先使用 sklearn 执行聚类，并把结果整理成前端可直接渲染的结构。"""
     from sklearn.preprocessing import StandardScaler
 
     rows = [dict(row) for row in (payload.get("rows") or [])]
@@ -200,6 +216,7 @@ def sklearn_clustering(payload):
 
 
 def manual_kmeans(payload):
+    """无 sklearn 时的手写 K-Means 兜底，只支持基础 kmeans 演示。"""
     rows = [dict(row) for row in (payload.get("rows") or [])]
     if not rows:
         return {"rows": [], "centers": [], "method": "kmeans"}
@@ -243,7 +260,7 @@ def manual_kmeans(payload):
 
 
 def clustering(payload):
-    """Run the selected clustering method and return rows ready for charting."""
+    """聚类总入口：优先走 sklearn，缺少依赖时对 kmeans 使用手写兜底。"""
     try:
         return sklearn_clustering(payload)
     except ImportError as exc:
