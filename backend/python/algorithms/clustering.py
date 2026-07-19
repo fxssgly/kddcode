@@ -162,6 +162,28 @@ def pca_coordinates(matrix):
     return [[round(float(point[0]), 4), round(float(point[1]), 4)] for point in projected]
 
 
+def pca(payload):
+    """只生成标准化后的二维 PCA 坐标，不执行聚类。"""
+    rows = [dict(row) for row in (payload.get("rows") or [])]
+    if not rows:
+        return {"rows": [], "total": 0}
+
+    raw_matrix = feature_matrix(rows)
+    try:
+        from sklearn.preprocessing import StandardScaler
+
+        matrix = StandardScaler().fit_transform(raw_matrix)
+        coordinates = pca_coordinates(matrix)
+    except ImportError:
+        matrix = manual_standardize(raw_matrix)
+        coordinates = manual_pca(matrix)
+
+    for row, point in zip(rows, coordinates):
+        row["pca1"] = point[0]
+        row["pca2"] = point[1]
+    return {"rows": rows, "total": len(rows)}
+
+
 def label_sort_key(label):
     """排序时把噪声类放到普通类别之后。"""
     return (label < 0, label)
@@ -186,6 +208,14 @@ def center_rows(rows):
     return centers
 
 
+def has_pca_coordinates(rows):
+    return all(row.get("pca1") is not None and row.get("pca2") is not None for row in rows)
+
+
+def pca_matrix(rows):
+    return [[as_float(row.get("pca1")), as_float(row.get("pca2"))] for row in rows]
+
+
 def sklearn_clustering(payload):
     """优先使用 sklearn 执行聚类，并把结果整理成前端可直接渲染的结构。"""
     from sklearn.preprocessing import StandardScaler
@@ -195,10 +225,15 @@ def sklearn_clustering(payload):
         return {"rows": [], "centers": [], "method": normalized_method(payload.get("method"))}
 
     method = normalized_method(payload.get("method"))
-    raw_matrix = feature_matrix(rows)
-    matrix = StandardScaler().fit_transform(raw_matrix)
-    coordinates = pca_coordinates(matrix)
-    model, labels = fit_predict(method, payload, matrix, rows)
+    if has_pca_coordinates(rows):
+        coordinates = pca_matrix(rows)
+        cluster_matrix = coordinates
+    else:
+        raw_matrix = feature_matrix(rows)
+        matrix = StandardScaler().fit_transform(raw_matrix)
+        coordinates = pca_coordinates(matrix)
+        cluster_matrix = coordinates
+    model, labels = fit_predict(method, payload, cluster_matrix, rows)
 
     for row, label, point in zip(rows, labels, coordinates):
         row["cluster"] = label
@@ -221,8 +256,7 @@ def manual_kmeans(payload):
     if not rows:
         return {"rows": [], "centers": [], "method": "kmeans"}
     k = cluster_count(payload, rows)
-    matrix = manual_standardize(feature_matrix(rows))
-    coordinates = manual_pca(matrix)
+    coordinates = pca_matrix(rows) if has_pca_coordinates(rows) else manual_pca(manual_standardize(feature_matrix(rows)))
     if coordinates:
         centers = [list(values) for values in coordinates[:k]]
         for _ in range(20):

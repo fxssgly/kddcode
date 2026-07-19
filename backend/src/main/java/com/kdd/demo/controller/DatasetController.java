@@ -5,6 +5,7 @@ package com.kdd.demo.controller;
  * 项目位置：Controller 层，是前端“载入数据/上传 CSV”按钮访问后端数据的统一入口。
  * 交互关系：具体解析 CSV、读取 MySQL、保存上传数据的工作都交给 DatasetService，控制器只负责把结果包装成 JSON。
  */
+import com.kdd.demo.service.AlgorithmService;
 import com.kdd.demo.service.DatasetService;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -27,13 +28,15 @@ import java.util.Map;
 })
 public class DatasetController {
     private final DatasetService datasetService;
+    private final AlgorithmService algorithmService;
 
     /**
      * 数据访问集中放在 DatasetService 中，控制器只负责把 HTTP 请求
      * 转换成简单的响应 Map。
      */
-    public DatasetController(DatasetService datasetService) {
+    public DatasetController(DatasetService datasetService, AlgorithmService algorithmService) {
         this.datasetService = datasetService;
+        this.algorithmService = algorithmService;
     }
 
     /**
@@ -46,6 +49,7 @@ public class DatasetController {
             rows = datasetService.getClassificationIrisRows();
         } else {
             rows = datasetService.getClusteringIrisRows();
+            return algorithmService.pcaRows(rows);
         }
         Map<String, Object> result = new HashMap<>();
         result.put("total", rows.size());
@@ -57,8 +61,13 @@ public class DatasetController {
      * 上传 Iris CSV 文件并写入 iris 表。
      */
     @PostMapping("/api/iris/upload")
-    public Map<String, Object> uploadIris(@RequestParam("file") MultipartFile file) throws IOException {
+    public Map<String, Object> uploadIris(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(value = "dataset", defaultValue = "clustering") String dataset) throws IOException {
         List<Map<String, Object>> rows = datasetService.uploadIris(file);
+        if (!"classification".equalsIgnoreCase(dataset)) {
+            return algorithmService.pcaRows(rows);
+        }
         Map<String, Object> result = new HashMap<>();
         result.put("total", rows.size());
         result.put("rows", rows);

@@ -24,7 +24,7 @@
 
     </el-aside>
 
-    <el-container>
+    <el-container class="main-panel">
       <el-header class="topbar">
         <div class="topbar-title">
           <h1>数据挖掘与分析综合实验平台</h1>
@@ -46,6 +46,9 @@
       <el-main class="content">
         <RouterView />
       </el-main>
+      <el-footer class="app-footer">
+        ©2026 Created by 疯狂星期五
+      </el-footer>
     </el-container>
 
     <!-- v-model 双向绑定弹窗显示状态：按钮把它改成 true，关闭弹窗时 Element Plus 会改回 false。 -->
@@ -212,6 +215,10 @@ body {
   min-height: 100vh;
 }
 
+.main-panel {
+  min-height: 100vh;
+}
+
 /* 侧边栏使用深色背景，并承担菜单和底部操作按钮。 */
 .sidebar {
   position: relative;
@@ -342,7 +349,18 @@ body {
 }
 
 .content {
+  flex: 1;
   padding: 22px 28px 28px;
+}
+
+.app-footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 48px;
+  padding: 0 28px;
+  color: #64748b;
+  font-size: 13px;
 }
 
 /* 每个实验页通用标题样式。 */

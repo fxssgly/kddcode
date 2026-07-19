@@ -88,7 +88,7 @@
 </template>
 
 <script setup>
-import { computed, nextTick, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import * as echarts from 'echarts'
 import { ElMessage } from 'element-plus'
 import { Refresh } from '@element-plus/icons-vue'
@@ -101,6 +101,44 @@ const minSupport = ref(0.2) // 最小支持度，默认 0.2。
 const minConfidence = ref(0.6) // 最小置信度，默认 0.6。
 const chartRef = ref(null) // 热力图 DOM 引用。
 let chart = null // ECharts 实例缓存，避免重复初始化。
+
+function resizeChart() {
+  chart?.resize()
+}
+
+function renderEmptyChart() {
+  if (!chartRef.value) return
+  if (!chart) chart = echarts.init(chartRef.value)
+  chart.clear()
+  chart.setOption({
+    backgroundColor: '#ffffff',
+    title: {
+      text: '点击分析数据后显示热力图',
+      left: 'center',
+      top: 'middle',
+      textStyle: {
+        color: '#94a3b8',
+        fontSize: 14,
+        fontWeight: 400,
+      },
+    },
+    xAxis: { show: false },
+    yAxis: { show: false },
+    series: [],
+  })
+  chart.resize()
+}
+
+onMounted(() => {
+  renderEmptyChart()
+  window.addEventListener('resize', resizeChart)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', resizeChart)
+  chart?.dispose()
+  chart = null
+})
 
 // 把后端返回的二维数组事务转换成表格行，TID 从 101 开始用于贴近样例数据。
 const transactionRows = computed(() => transactions.value.map((items, index) => ({
@@ -245,7 +283,7 @@ function clearAnalysis() {
   // 换数据后清空旧规则和旧图表，避免用户误读上一轮分析结果。
   rules.value = []
   frequentPairs.value = []
-  if (chart) chart.clear()
+  renderEmptyChart()
 }
 
 async function loadData() {

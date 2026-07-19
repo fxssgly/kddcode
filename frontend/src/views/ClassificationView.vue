@@ -61,7 +61,7 @@
 </template>
 
 <script setup>
-import { nextTick, ref } from 'vue'
+import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import * as echarts from 'echarts'
 import { ElMessage } from 'element-plus'
 import { Refresh } from '@element-plus/icons-vue'
@@ -83,6 +83,42 @@ const activeTree = ref('cart')
 const cartTree = ref(null)
 const id3Tree = ref(null)
 let chart = null // ECharts tree 实例。
+
+function resizeChart() {
+  chart?.resize()
+}
+
+function renderEmptyTree() {
+  if (!chartRef.value) return
+  if (!chart) chart = echarts.init(chartRef.value)
+  chart.clear()
+  chart.setOption({
+    backgroundColor: '#ffffff',
+    title: {
+      text: '点击分类分析后显示决策树',
+      left: 'center',
+      top: 'middle',
+      textStyle: {
+        color: '#94a3b8',
+        fontSize: 14,
+        fontWeight: 400,
+      },
+    },
+    series: [],
+  })
+  chart.resize()
+}
+
+onMounted(() => {
+  renderEmptyTree()
+  window.addEventListener('resize', resizeChart)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', resizeChart)
+  chart?.dispose()
+  chart = null
+})
 
 // 不同 Iris 类别对应的基础颜色，树节点会根据类别纯度做浅色混合。
 const classPalette = {
@@ -236,7 +272,7 @@ function renderTree(tree) {
 
 function clearTree() {
   // 重新载入数据后，旧树和旧指标都需要清空。
-  if (chart) chart.clear()
+  renderEmptyTree()
   cartTree.value = null
   id3Tree.value = null
   activeTree.value = 'cart'
@@ -261,7 +297,7 @@ async function loadData() {
 
 async function handleUpload(file) {
   // 上传用户提供的 Iris CSV，并阻止 Element Plus 自动上传。
-  const response = await uploadIris(file)
+  const response = await uploadIris(file, 'classification')
   rows.value = response.data.rows
   clearTree()
   ElMessage.success('CSV 已上传')

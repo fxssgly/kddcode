@@ -1,14 +1,4 @@
-<!--
-  文件作用：K-Means 聚类实验页面，展示 Iris 数据表和 PCA 散点图。
-  项目位置：前端 views 层，对应后端 ClusteringController 和 DatasetController。
-  交互关系：前端负责参数、表格和图表；后端负责读取数据并执行聚类算法。
-
-  逐词注释：
-  rows 是样本行；centers 是聚类中心；k 是聚类个数；featureNames 是参与 PCA 的特征字段。
-  PCA 是降维展示方法；standardize 表示标准化；covariance 表示协方差；scatter 表示散点图。
-  dataZoom 开启鼠标缩放和平移；series 数组里每个对象是一组点或中心。
--->
-<template>
+﻿<template>
   <section class="page">
     <div class="page-title">
       <strong>聚类分析</strong>
@@ -17,7 +7,6 @@
 
     <el-card shadow="never" class="toolbar-card">
       <el-form inline label-width="86px">
-        <!-- 数据操作和算法参数放在同一行，方便实验时反复调整 k 值。 -->
         <el-form-item label="数据操作">
           <el-button type="primary" :icon="Refresh" @click="loadData">载入数据</el-button>
           <el-upload :show-file-list="false" accept=".csv" :before-upload="handleUpload">
@@ -83,33 +72,28 @@
 </template>
 
 <script setup>
-import { computed, nextTick, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import * as echarts from 'echarts'
 import { ElMessage } from 'element-plus'
 import { Refresh } from '@element-plus/icons-vue'
 import { fetchIris, runClustering, uploadIris } from '../api/request'
 import DataTable from './components/DataTable.vue'
 
-// rows 保存表格和散点图共同使用的数据。
-const rows = ref([]) // 表格行和散点图点位共用的数据源。
-// centers 保存后端返回的聚类中心，用菱形标记叠加到散点图上。
-const centers = ref([]) // 聚类中心点，由后端计算后返回。
-const method = ref('kmeans') // 当前选择的聚类算法。
-const k = ref(3) // 需要预设类别数的算法默认分 3 类。
-const linkage = ref('ward') // 层次聚类的连接方式。
-const threshold = ref(0.2) // Birch 的阈值参数。
-const eps = ref(0.5) // DBSCAN 的邻域半径。
-const minSamples = ref(5) // DBSCAN 的最小样本数。
-const bandwidth = ref(1) // MeanShift 带宽；0 表示交给后端自动估计。
-const resultMethodLabel = ref('未聚类') // 后端实际执行的算法名称。
-const resultClusterCount = ref(null) // 后端实际得到的簇数量。
-const resultNoiseCount = ref(0) // DBSCAN 等算法可能产生噪声点。
-const analyzing = ref(false) // 聚类请求进行中时的页面状态。
-const chartRef = ref(null) // 散点图 DOM 引用。
-let chart = null // ECharts 散点图实例。
-
-// Iris 的 4 个数值特征，用于前端 PCA 降维展示。
-const featureNames = ['sepal_length', 'sepal_width', 'petal_length', 'petal_width']
+const rows = ref([])
+const centers = ref([])
+const method = ref('kmeans')
+const k = ref(3)
+const linkage = ref('ward')
+const threshold = ref(0.2)
+const eps = ref(0.5)
+const minSamples = ref(5)
+const bandwidth = ref(1)
+const resultMethodLabel = ref('未聚类')
+const resultClusterCount = ref(null)
+const resultNoiseCount = ref(0)
+const analyzing = ref(false)
+const chartRef = ref(null)
+let chart = null
 
 const methodOptions = [
   { label: 'K-Means', value: 'kmeans' },
@@ -126,15 +110,40 @@ const currentMethodLabel = computed(() => {
 
 const needsClusterCount = computed(() => ['kmeans', 'agglomerative', 'birch'].includes(method.value))
 
+function resizeChart() {
+  chart?.resize()
+}
+
+function renderEmptyChart() {
+  if (!chartRef.value) return
+  if (!chart) chart = echarts.init(chartRef.value)
+  chart.clear()
+  chart.setOption({
+    backgroundColor: '#ffffff',
+    title: {
+      text: '点击载入数据后显示散点图',
+      left: 'center',
+      top: 'middle',
+      textStyle: {
+        color: '#94a3b8',
+        fontSize: 14,
+        fontWeight: 400,
+      },
+    },
+    xAxis: { show: false },
+    yAxis: { show: false },
+    series: [],
+  })
+  chart.resize()
+}
+
 function scatterSize(count) {
-  // 数据越多点越小，减少图表重叠。
   if (count > 300) return 5
   if (count > 120) return 6
   return 8
 }
 
 function valueAxis(name) {
-  // 聚类图和回归图都使用类似的数值坐标轴风格。
   return {
     type: 'value',
     name,
@@ -150,94 +159,6 @@ function valueAxis(name) {
     axisLabel: { color: '#8b95a3' },
     splitLine: { show: true, lineStyle: { color: '#edf1f7', width: 1 } },
   }
-}
-
-function toNumber(value) {
-  // 上传 CSV 时数值可能是字符串，这里统一转成可计算数字。
-  const number = Number(value)
-  return Number.isFinite(number) ? number : 0
-}
-
-function standardizeMatrix(matrix) {
-  if (!matrix.length) return []
-  const count = matrix.length
-  const columns = matrix[0].length
-  // PCA 前先标准化，避免不同量纲的特征影响主成分方向。
-  const means = Array.from({ length: columns }, (_, columnIndex) => (
-    matrix.reduce((total, row) => total + row[columnIndex], 0) / count
-  ))
-  // stds 是每列标准差；标准差为 0 时用 1 替代，避免除以 0。
-  const stds = Array.from({ length: columns }, (_, columnIndex) => {
-    const variance = matrix.reduce((total, row) => total + (row[columnIndex] - means[columnIndex]) ** 2, 0) / count
-    return Math.sqrt(variance) || 1
-  })
-  return matrix.map((row) => row.map((value, columnIndex) => (value - means[columnIndex]) / stds[columnIndex]))
-}
-
-function matVec(matrix, vector) {
-  // 矩阵乘向量，是幂迭代求特征向量的基础操作。
-  return matrix.map((row) => row.reduce((total, value, index) => total + value * vector[index], 0))
-}
-
-function vectorNorm(vector) {
-  // 向量长度为 0 时返回 1，避免后续除以 0。
-  return Math.sqrt(vector.reduce((total, value) => total + value * value, 0)) || 1
-}
-
-function powerIteration(matrix, initial = null) {
-  // 幂迭代用于估计协方差矩阵最大的特征值和特征向量。
-  let vector = initial ? [...initial] : Array.from({ length: matrix.length }, () => 1)
-  vector = vector.map((value) => value / vectorNorm(vector))
-  for (let index = 0; index < 80; index++) {
-    // 重复“矩阵乘向量再归一化”，逐步逼近最大特征向量。
-    const nextVector = matVec(matrix, vector)
-    const length = vectorNorm(nextVector)
-    if (length < 1e-12) break
-    vector = nextVector.map((value) => value / length)
-  }
-  const transformed = matVec(matrix, vector)
-  const eigenvalue = vector.reduce((total, value, index) => total + value * transformed[index], 0)
-  return { eigenvalue, vector }
-}
-
-function covarianceModel(matrix) {
-  if (!matrix.length) return null
-  const count = matrix.length
-  const columns = matrix[0].length
-  // 中心化后的矩阵用于计算协方差矩阵。
-  const means = Array.from({ length: columns }, (_, columnIndex) => (
-    matrix.reduce((total, row) => total + row[columnIndex], 0) / count
-  ))
-  const centered = matrix.map((row) => row.map((value, columnIndex) => value - means[columnIndex]))
-  const denominator = Math.max(count - 1, 1)
-  const covariance = Array.from({ length: columns }, (_, rowIndex) => (
-    Array.from({ length: columns }, (_, columnIndex) => (
-      centered.reduce((total, row) => total + row[rowIndex] * row[columnIndex], 0) / denominator
-    ))
-  ))
-  const first = powerIteration(covariance)
-  // 从协方差矩阵中减去第一主成分的贡献，再求第二主成分。
-  const deflated = covariance.map((row, rowIndex) => (
-    row.map((value, columnIndex) => value - first.eigenvalue * first.vector[rowIndex] * first.vector[columnIndex])
-  ))
-  const second = powerIteration(deflated, [0.5, -1, 0.75, -0.25])
-  return { centered, vectors: [first.vector, second.vector] }
-}
-
-function rowsWithPca(sourceRows) {
-  // 在不修改原始行对象的前提下，为每行附加 pca1/pca2，供二维散点图展示。
-  const nextRows = sourceRows.map((row) => ({ ...row }))
-  const matrix = standardizeMatrix(nextRows.map((row) => featureNames.map((name) => toNumber(row[name]))))
-  const model = covarianceModel(matrix)
-  if (!model) return nextRows
-  return nextRows.map((row, rowIndex) => {
-    const centeredValues = model.centered[rowIndex]
-    return {
-      ...row,
-      pca1: Number(model.vectors[0].reduce((total, value, index) => total + centeredValues[index] * value, 0).toFixed(4)),
-      pca2: Number(model.vectors[1].reduce((total, value, index) => total + centeredValues[index] * value, 0).toFixed(4)),
-    }
-  })
 }
 
 function clusterName(cluster) {
@@ -263,22 +184,43 @@ function clusteringParams() {
   }
 }
 
+function hasPcaRows(nextRows) {
+  return nextRows.every((item) => item.pca1 !== undefined && item.pca2 !== undefined)
+}
+
+async function ensurePcaRows(nextRows) {
+  if (hasPcaRows(nextRows)) {
+    return nextRows
+  }
+  const response = await runClustering({
+    method: method.value,
+    rows: nextRows,
+    k: k.value,
+    linkage: linkage.value,
+    threshold: threshold.value,
+    eps: eps.value,
+    min_samples: minSamples.value,
+    bandwidth: bandwidth.value,
+  })
+  return (response.data.rows || []).map(({ cluster, ...row }) => row)
+}
+
 function renderChart() {
   if (!chartRef.value) return
   if (!chart) chart = echarts.init(chartRef.value)
   chart.clear()
-  // 如果已经有 cluster 字段，则按聚类结果分组；否则展示为未聚类数据。
+  if (rows.value.some((item) => item.pca1 === undefined || item.pca2 === undefined)) {
+    renderEmptyChart()
+    ElMessage.error('后端没有返回 PCA 坐标，无法绘制降维散点图')
+    return
+  }
   const hasClusterResult = rows.value.some((item) => item.cluster !== undefined)
   const groups = {}
   rows.value.forEach((item) => {
-    // 已聚类时按 cluster 分组；未聚类时全部归到同一个系列。
     const name = hasClusterResult ? clusterName(item.cluster) : '未聚类数据'
     groups[name] = groups[name] || []
-    const x = item.pca1 ?? item.petal_length
-    const y = item.pca2 ?? item.petal_width
-    groups[name].push([x, y, item.species])
+    groups[name].push([item.pca1, item.pca2, item.species])
   })
-  // 每个聚类类别生成一个 scatter series，图例会自动展示类别名称。
   const clusterSeries = Object.keys(groups).map((name) => ({
     name,
     type: 'scatter',
@@ -295,7 +237,6 @@ function renderChart() {
     data: groups[name],
   }))
   chart.setOption({
-    // color 控制各类颜色；legend 控制图例；grid 控制绘图区边距；series 控制散点与中心点。
     backgroundColor: '#ffffff',
     color: hasClusterResult
       ? ['#2563eb', '#f97316', '#16a34a', '#9333ea', '#dc2626', '#0891b2', '#ca8a04', '#db2777']
@@ -320,7 +261,6 @@ function renderChart() {
       {
         name: '聚类中心',
         type: 'scatter',
-        // 聚类中心使用菱形，和普通样本点区分。
         symbol: 'diamond',
         symbolSize: 18,
         itemStyle: {
@@ -349,9 +289,8 @@ function renderChart() {
 }
 
 async function loadData() {
-  // 载入默认 Iris 数据后，先在前端计算 PCA 并立即绘制未聚类散点图。
   const response = await fetchIris('clustering')
-  rows.value = rowsWithPca(response.data.rows)
+  rows.value = await ensurePcaRows(response.data.rows || [])
   centers.value = []
   resultMethodLabel.value = '未聚类'
   resultClusterCount.value = null
@@ -362,9 +301,8 @@ async function loadData() {
 }
 
 async function handleUpload(file) {
-  // 上传 CSV 后同样计算 PCA；返回 false 由我们接管上传流程。
-  const response = await uploadIris(file)
-  rows.value = rowsWithPca(response.data.rows)
+  const response = await uploadIris(file, 'clustering')
+  rows.value = await ensurePcaRows(response.data.rows || [])
   centers.value = []
   resultMethodLabel.value = '未聚类'
   resultClusterCount.value = null
@@ -382,9 +320,7 @@ async function analyze() {
   }
   analyzing.value = true
   try {
-    // 聚类本身由后端完成；前端负责接收聚类标签和中心点并重绘图表。
     const response = await runClustering(clusteringParams())
-    // 后端返回的 rows 会带 cluster 字段，centers 用于绘制菱形中心点。
     rows.value = response.data.rows
     centers.value = response.data.centers || []
     resultMethodLabel.value = response.data.methodName || currentMethodLabel.value
@@ -400,6 +336,17 @@ async function analyze() {
     analyzing.value = false
   }
 }
+
+onMounted(() => {
+  renderEmptyChart()
+  window.addEventListener('resize', resizeChart)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', resizeChart)
+  chart?.dispose()
+  chart = null
+})
 </script>
 
 <style scoped>
@@ -436,26 +383,5 @@ async function analyze() {
 
 .chart-tags .el-tag {
   justify-content: center;
-  width: 100%;
-}
-
-.method-tag {
-  justify-content: flex-start !important;
-}
-
-@media (max-width: 720px) {
-  .card-header {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-
-  .chart-tags {
-    grid-template-columns: 1fr;
-    width: 100%;
-  }
-
-  .method-tag {
-    justify-content: center !important;
-  }
 }
 </style>

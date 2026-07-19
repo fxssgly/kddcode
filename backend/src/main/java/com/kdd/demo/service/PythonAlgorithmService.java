@@ -161,7 +161,7 @@ public class PythonAlgorithmService {
      */
     private double distance(Map<String, Object> row, Map<String, Double> center) {
         double sum = 0.0;
-        for (String feature : Arrays.asList("sepal_length", "sepal_width", "petal_length", "petal_width")) {
+        for (String feature : clusteringFeatures(row)) {
             double diff = number(row.get(feature), 0) - center.get(feature);
             sum += diff * diff;
         }
@@ -173,7 +173,7 @@ public class PythonAlgorithmService {
      */
     private Map<String, Double> averageCenter(List<Map<String, Object>> rows) {
         Map<String, Double> center = new LinkedHashMap<>();
-        for (String feature : Arrays.asList("sepal_length", "sepal_width", "petal_length", "petal_width")) {
+        for (String feature : clusteringFeatures(rows.get(0))) {
             double sum = 0.0;
             for (Map<String, Object> row : rows) {
                 sum += number(row.get(feature), 0);
@@ -188,10 +188,17 @@ public class PythonAlgorithmService {
      */
     private Map<String, Double> centerFrom(Map<String, Object> row) {
         Map<String, Double> center = new LinkedHashMap<>();
-        for (String feature : Arrays.asList("sepal_length", "sepal_width", "petal_length", "petal_width")) {
+        for (String feature : clusteringFeatures(row)) {
             center.put(feature, number(row.get(feature), 0));
         }
         return center;
+    }
+
+    private List<String> clusteringFeatures(Map<String, Object> row) {
+        if (row.containsKey("pca1") && row.containsKey("pca2")) {
+            return Arrays.asList("pca1", "pca2");
+        }
+        return Arrays.asList("sepal_length", "sepal_width", "petal_length", "petal_width");
     }
 
     /**

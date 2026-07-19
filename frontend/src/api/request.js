@@ -26,10 +26,10 @@ export function fetchIris(dataset = 'clustering') {
 }
 
 // 上传 Iris CSV；FormData 用来按 multipart/form-data 格式传文件，这是浏览器上传文件的标准方式。
-export function uploadIris(file) {
+export function uploadIris(file, dataset = 'clustering') {
   const form = new FormData()
   form.append('file', file)
-  return request.post('/api/iris/upload', form)
+  return request.post('/api/iris/upload', form, { params: { dataset } })
 }
 
 // 读取关联规则实验的默认事务数据。

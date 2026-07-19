@@ -96,7 +96,7 @@
 </template>
 
 <script setup>
-import { computed, nextTick, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import * as echarts from 'echarts'
 import { ElMessage } from 'element-plus'
 import { Refresh } from '@element-plus/icons-vue'
@@ -123,6 +123,10 @@ const chartRefs = {
 const chartInstances = {}
 // resizeFrames 用来合并同一帧内的 resize 请求，减少图表抖动。
 const resizeFrames = {}
+
+function resizeCharts() {
+  Object.values(chartInstances).forEach((chart) => chart.resize())
+}
 
 // 三张图的差异集中放在配置里，渲染函数可以复用。
 const chartConfigs = [
@@ -153,9 +157,88 @@ const chartConfigs = [
 // 噪声点数量由当前 points 实时计算，数据变更后页面自动刷新。
 const outlierCount = computed(() => points.value.filter((item) => item.type === '噪声点').length)
 
+function renderEmptyChart(config) {
+  const element = chartRefs[config.key].value
+  if (!element) return
+  if (!chartInstances[config.key]) chartInstances[config.key] = echarts.init(element)
+  chartInstances[config.key].clear()
+  chartInstances[config.key].setOption({
+    backgroundColor: '#ffffff',
+    title: {
+      text: '点击开始回归后显示拟合图',
+      left: 'center',
+      top: 'middle',
+      textStyle: {
+        color: '#94a3b8',
+        fontSize: 14,
+        fontWeight: 400,
+      },
+    },
+    xAxis: { show: false },
+    yAxis: { show: false },
+    series: [],
+  })
+  scheduleChartResize(config.key)
+}
+
+function renderEmptyCharts() {
+  chartConfigs.forEach(renderEmptyChart)
+}
+
+onMounted(async () => {
+  await nextTick()
+  renderEmptyCharts()
+  window.addEventListener('resize', resizeCharts)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', resizeCharts)
+  Object.entries(resizeFrames).forEach(([key, frame]) => {
+    if (frame) cancelAnimationFrame(frame)
+    resizeFrames[key] = null
+  })
+  Object.entries(chartInstances).forEach(([key, chart]) => {
+    chart.dispose()
+    delete chartInstances[key]
+  })
+})
+
 function sortedPoints() {
   // 拟合线需要按 x 从小到大连接，否则折线会来回跳。
   return [...points.value].sort((a, b) => a.x - b.x)
+}
+
+function modelByKey(key) {
+  return models.value.find((item) => item.key === key)
+}
+
+function predictionAt(config, xValue) {
+  const model = modelByKey(config.key)
+  if (!model) return null
+  if (config.key === 'polynomial') {
+    return model.a * xValue * xValue + model.b * xValue + model.c
+  }
+  return model.slope * xValue + model.intercept
+}
+
+function regressionLineData(config, sorted) {
+  const fallback = sorted
+    .map((item) => [item.x, item[config.predictionField]])
+    .filter((item) => Number.isFinite(item[0]) && Number.isFinite(item[1]))
+  if (!fallback.length) return []
+
+  const minX = fallback[0][0]
+  const maxX = fallback[fallback.length - 1][0]
+  const steps = config.key === 'polynomial' ? 120 : 2
+  const line = []
+  for (let index = 0; index < steps; index++) {
+    const ratio = steps === 1 ? 0 : index / (steps - 1)
+    const xValue = minX + (maxX - minX) * ratio
+    const yValue = predictionAt(config, xValue)
+    if (!Number.isFinite(yValue)) return fallback
+    line.push([Number(xValue.toFixed(4)), Number(yValue.toFixed(4))])
+  }
+  return line
 }
 
 function scatterSize(count) {
@@ -168,6 +251,7 @@ function scatterSize(count) {
 function valueAxis(name) {
   // 统一回归图的坐标轴视觉样式。
   return {
+    show: true,
     type: 'value',
     name,
     nameLocation: 'end',
@@ -182,7 +266,7 @@ function valueAxis(name) {
 
 function metricLabel(key) {
   // 卡片标题右侧显示当前模型指标；未分析时显示等待状态。
-  const model = models.value.find((item) => item.key === key)
+  const model = modelByKey(key)
   if (!model) return '等待分析'
   return `R²=${Number(model.r2).toFixed(4)}，MSE=${Number(model.mse).toFixed(2)}`
 }
@@ -193,6 +277,8 @@ function renderChart(config) {
   // 第一次渲染时初始化图表，后续只更新配置。
   if (!chartInstances[config.key]) chartInstances[config.key] = echarts.init(element)
   const sorted = sortedPoints()
+  const lineData = regressionLineData(config, sorted)
+  chartInstances[config.key].clear()
   chartInstances[config.key].setOption({
     // 三个 series 分别画训练点、测试点和模型拟合线。
     backgroundColor: '#ffffff',
@@ -235,7 +321,7 @@ function renderChart(config) {
         smooth: !!config.smooth,
         showSymbol: false,
         lineStyle: { width: 3 },
-        data: sorted.map((item) => [item.x, item[config.predictionField]]),
+        data: lineData,
       },
     ],
   })
@@ -263,7 +349,7 @@ function clearCharts() {
     if (frame) cancelAnimationFrame(frame)
     resizeFrames[key] = null
   })
-  Object.values(chartInstances).forEach((chart) => chart.clear())
+  renderEmptyCharts()
 }
 
 async function applyResult(response, message) {

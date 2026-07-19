@@ -16,7 +16,7 @@ warnings.filterwarnings("ignore", category=UserWarning, module=r"joblib\..*")
 
 from algorithms.association import association
 from algorithms.classification import classification
-from algorithms.clustering import clustering
+from algorithms.clustering import clustering, pca
 from algorithms.common import binary_type
 from algorithms.regression import regression
 
@@ -24,6 +24,7 @@ from algorithms.regression import regression
 HANDLERS = {
     "association": association,
     "clustering": clustering,
+    "pca": pca,
     "classification": classification,
     "regression": regression,
 }
