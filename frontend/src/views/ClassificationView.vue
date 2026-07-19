@@ -310,7 +310,7 @@ async function analyze() {
     return
   }
   // 后端返回预测结果、指标和树结构；前端负责展示和绘制。
-  const response = await runClassification(maxDepth.value, minLeaf.value)
+  const response = await runClassification(maxDepth.value, minLeaf.value, rows.value)
   // 指标先格式化成字符串，模板中直接展示即可。
   rows.value = response.data.rows
   accuracyText.value = `${Math.round(response.data.accuracy * 100)}%`

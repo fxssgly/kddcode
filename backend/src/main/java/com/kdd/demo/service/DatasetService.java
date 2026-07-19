@@ -79,31 +79,15 @@ public class DatasetService {
         return new ArrayList<>(grouped.values());
     }
 
-    // 上传 Iris CSV 后覆盖 iris 表，再重新读取数据库，保证返回内容和数据库最终状态一致。
+    // 上传 Iris CSV 后只解析并返回行数据，不写入 iris 表，避免覆盖默认数据。
     public List<Map<String, Object>> uploadIris(MultipartFile file) throws IOException {
-        List<IrisSample> samples = parseIris(file).stream()
-                .map(this::toIrisSample)
-                .collect(Collectors.toList());
-        irisRepository.deleteAll();
-        irisRepository.saveAll(samples);
-        return getIrisRows();
+        return parseIris(file);
     }
 
-    // 上传事务 CSV 后把每个商品项拆成一行保存，方便数据库按 transaction_id 查询和排序。
+    // 上传事务 CSV 后只解析并返回交易篮子，不写入 transaction_items 表。
     public List<List<String>> uploadTransactions(MultipartFile file) throws IOException {
         List<List<String>> transactions = parseTransactions(file);
-        List<TransactionItem> rows = new ArrayList<>();
-        for (int transactionIndex = 0; transactionIndex < transactions.size(); transactionIndex++) {
-            for (String item : transactions.get(transactionIndex)) {
-                TransactionItem row = new TransactionItem();
-                row.setTransactionId(transactionIndex + 1);
-                row.setItemName(item);
-                rows.add(row);
-            }
-        }
-        transactionRepository.deleteAll();
-        transactionRepository.saveAll(rows);
-        return getTransactions();
+        return transactions;
     }
 
     // 数据库实体字段是 Java 驼峰名，前端和 Python 使用 snake_case，所以在这里做字段转换。

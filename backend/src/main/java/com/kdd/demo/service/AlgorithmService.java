@@ -32,7 +32,12 @@ public class AlgorithmService {
      */
     public Map<String, Object> association(Map<String, Object> body) {
         Map<String, Object> payload = new HashMap<>();
-        payload.put("transactions", datasetService.getTransactions());
+        Object transactions = body.get("transactions");
+        if (transactions instanceof List) {
+            payload.put("transactions", transactions);
+        } else {
+            payload.put("transactions", datasetService.getTransactions());
+        }
         payload.put("min_support", number(body, "min_support", 0.2));
         payload.put("min_confidence", number(body, "min_confidence", 0.4));
         return pythonAlgorithmService.run("association", payload);
@@ -74,7 +79,12 @@ public class AlgorithmService {
 
     public Map<String, Object> classification(Map<String, Object> body) {
         Map<String, Object> payload = new HashMap<>();
-        payload.put("rows", datasetService.getClassificationIrisRows());
+        Object rows = body.get("rows");
+        if (rows instanceof List) {
+            payload.put("rows", rows);
+        } else {
+            payload.put("rows", datasetService.getClassificationIrisRows());
+        }
         payload.put("max_depth", (int) number(body, "max_depth", 3));
         payload.put("min_leaf", (int) number(body, "min_leaf", 2));
         return pythonAlgorithmService.run("classification", payload);

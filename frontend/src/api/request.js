@@ -50,10 +50,11 @@ export function fetchRegressionRows() {
 }
 
 // 运行关联规则：页面传入支持度和置信度，后端返回规则列表和二项指标。
-export function runAssociation(minSupport, minConfidence) {
+export function runAssociation(minSupport, minConfidence, transactions = null) {
   return request.post('/api/association', {
     min_support: minSupport,
     min_confidence: minConfidence,
+    transactions,
   })
 }
 
@@ -63,10 +64,11 @@ export function runClustering(params) {
 }
 
 // 运行分类：页面传树深和叶子样本数，后端返回预测结果、评估指标和树结构。
-export function runClassification(maxDepth, minLeaf) {
+export function runClassification(maxDepth, minLeaf, rows = null) {
   return request.post('/api/classification', {
     max_depth: maxDepth,
     min_leaf: minLeaf,
+    rows,
   })
 }
 

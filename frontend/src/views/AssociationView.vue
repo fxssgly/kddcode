@@ -309,7 +309,7 @@ async function analyze() {
     return
   }
   // 提交阈值参数后，后端根据当前事务数据重新计算关联规则。
-  const response = await runAssociation(minSupport.value, minConfidence.value)
+  const response = await runAssociation(minSupport.value, minConfidence.value, transactions.value)
   // 后端返回的数据覆盖当前页面状态，确保表格和热力图展示同一轮分析结果。
   transactions.value = response.data.transactions
   rules.value = response.data.rules
