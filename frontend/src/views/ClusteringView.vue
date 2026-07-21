@@ -76,7 +76,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import * as echarts from 'echarts'
 import { ElMessage } from 'element-plus'
 import { Refresh } from '@element-plus/icons-vue'
-import { fetchIris, runClustering, uploadIris } from '../api/request'
+import { fetchIris, fetchPcaRows, runClustering, uploadIris } from '../api/request'
 import DataTable from './components/DataTable.vue'
 
 const rows = ref([])
@@ -192,17 +192,8 @@ async function ensurePcaRows(nextRows) {
   if (hasPcaRows(nextRows)) {
     return nextRows
   }
-  const response = await runClustering({
-    method: method.value,
-    rows: nextRows,
-    k: k.value,
-    linkage: linkage.value,
-    threshold: threshold.value,
-    eps: eps.value,
-    min_samples: minSamples.value,
-    bandwidth: bandwidth.value,
-  })
-  return (response.data.rows || []).map(({ cluster, ...row }) => row)
+  const response = await fetchPcaRows(nextRows)
+  return response.data.rows || []
 }
 
 function renderChart() {
@@ -289,27 +280,37 @@ function renderChart() {
 }
 
 async function loadData() {
-  const response = await fetchIris('clustering')
-  rows.value = await ensurePcaRows(response.data.rows || [])
-  centers.value = []
-  resultMethodLabel.value = '未聚类'
-  resultClusterCount.value = null
-  resultNoiseCount.value = 0
-  await nextTick()
-  renderChart()
-  ElMessage.success('默认数据已载入')
+  try {
+    const response = await fetchIris('clustering')
+    rows.value = await ensurePcaRows(response.data.rows || [])
+    centers.value = []
+    resultMethodLabel.value = '未聚类'
+    resultClusterCount.value = null
+    resultNoiseCount.value = 0
+    await nextTick()
+    renderChart()
+    ElMessage.success('默认数据已载入')
+  } catch (error) {
+    const message = error.response?.data?.message || error.response?.data?.error || error.message || '默认数据载入失败'
+    ElMessage.error(message)
+  }
 }
 
 async function handleUpload(file) {
-  const response = await uploadIris(file, 'clustering')
-  rows.value = await ensurePcaRows(response.data.rows || [])
-  centers.value = []
-  resultMethodLabel.value = '未聚类'
-  resultClusterCount.value = null
-  resultNoiseCount.value = 0
-  await nextTick()
-  renderChart()
-  ElMessage.success('CSV 已上传')
+  try {
+    const response = await uploadIris(file, 'clustering')
+    rows.value = await ensurePcaRows(response.data.rows || [])
+    centers.value = []
+    resultMethodLabel.value = '未聚类'
+    resultClusterCount.value = null
+    resultNoiseCount.value = 0
+    await nextTick()
+    renderChart()
+    ElMessage.success('CSV 已上传')
+  } catch (error) {
+    const message = error.response?.data?.message || error.response?.data?.error || error.message || 'CSV 上传失败'
+    ElMessage.error(message)
+  }
   return false
 }
 

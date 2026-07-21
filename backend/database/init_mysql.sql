@@ -14,6 +14,7 @@ SET NAMES utf8mb4;
 DROP TABLE IF EXISTS transaction_items;
 DROP TABLE IF EXISTS association_data;
 DROP TABLE IF EXISTS regression_data;
+DROP TABLE IF EXISTS iris2;
 DROP TABLE IF EXISTS iris;
 DROP TABLE IF EXISTS users;
 
@@ -188,6 +189,15 @@ INSERT INTO iris (id, SepL, SepW, PetL, PetW, Species) VALUES
 (148,6.5,3,5.2,2,'virginica'),
 (149,6.2,3.4,5.4,2.3,'virginica'),
 (150,5.9,3,5.1,1.8,'virginica');
+
+-- Iris2 分类样本表：结构与 iris 相同，分类实验使用该表。
+-- 先复制标准 Iris 数据，再应用 non_code_files/data/iris2.csv 中的差异值。
+CREATE TABLE iris2 LIKE iris;
+INSERT INTO iris2 SELECT * FROM iris;
+UPDATE iris2 SET SepL = 57 WHERE id = 16;
+UPDATE iris2 SET SepL = 0, Species = '' WHERE id = 57;
+UPDATE iris2 SET PetW = 0 WHERE id = 141;
+UPDATE iris2 SET SepW = 0, PetL = -5.7 WHERE id = 145;
 
 -- 事务项明细表：一行表示一笔交易中的一个商品。
 CREATE TABLE transaction_items (

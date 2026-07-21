@@ -32,6 +32,10 @@ export function uploadIris(file, dataset = 'clustering') {
   return request.post('/api/iris/upload', form, { params: { dataset } })
 }
 
+export function fetchPcaRows(rows) {
+  return request.post('/api/iris/pca', { rows })
+}
+
 // 读取关联规则实验的默认事务数据。
 export function fetchTransactions() {
   return request.get('/api/transactions')

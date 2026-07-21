@@ -48,9 +48,11 @@ public class DatasetService {
         return getIrisRows();
     }
 
-    // 分类和聚类当前共用 Iris 数据，只是在前端和算法侧的使用方式不同。
     public List<Map<String, Object>> getClassificationIrisRows() {
-        return getIrisRows();
+        return irisRepository.findAllFromIris2().stream()
+                .sorted(Comparator.comparing(IrisSample::getId))
+                .map(this::toIrisMap)
+                .collect(Collectors.toList());
     }
 
     // 回归数据按 id 升序返回，保证表格和图表每次展示顺序稳定。

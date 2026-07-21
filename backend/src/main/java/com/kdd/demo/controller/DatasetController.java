@@ -10,6 +10,7 @@ import com.kdd.demo.service.DatasetService;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
@@ -55,6 +56,17 @@ public class DatasetController {
         result.put("total", rows.size());
         result.put("rows", rows);
         return result;
+    }
+
+    @PostMapping("/api/iris/pca")
+    public Map<String, Object> pca(@RequestBody Map<String, Object> body) {
+        Object rows = body.get("rows");
+        if (rows instanceof List) {
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> typedRows = (List<Map<String, Object>>) rows;
+            return algorithmService.pcaRows(typedRows);
+        }
+        return algorithmService.pcaRows(datasetService.getClusteringIrisRows());
     }
 
     /**

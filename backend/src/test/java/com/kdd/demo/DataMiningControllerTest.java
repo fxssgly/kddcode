@@ -40,7 +40,8 @@ class DataMiningControllerTest {
 
         mockMvc.perform(get("/api/iris"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.total", greaterThan(0)));
+                .andExpect(jsonPath("$.total", greaterThan(0)))
+                .andExpect(jsonPath("$.rows[0].pca1").exists());
 
         mockMvc.perform(get("/api/transactions"))
                 .andExpect(status().isOk())
@@ -57,6 +58,13 @@ class DataMiningControllerTest {
                         .content("{\"k\":3}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.rows.length()", greaterThan(0)));
+
+        mockMvc.perform(post("/api/iris/pca")
+                        .contentType("application/json")
+                        .content("{\"rows\":[{\"id\":1,\"sepal_length\":5.1,\"sepal_width\":3.5,\"petal_length\":1.4,\"petal_width\":0.2,\"species\":\"setosa\"},{\"id\":2,\"sepal_length\":7.0,\"sepal_width\":3.2,\"petal_length\":4.7,\"petal_width\":1.4,\"species\":\"versicolor\"}]}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.rows[0].pca1").exists())
+                .andExpect(jsonPath("$.rows[0].cluster").doesNotExist());
 
         mockMvc.perform(post("/api/classification")
                         .contentType("application/json")

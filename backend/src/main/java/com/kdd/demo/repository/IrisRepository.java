@@ -7,6 +7,9 @@ package com.kdd.demo.repository;
  */
 import com.kdd.demo.entity.IrisSample;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+
+import java.util.List;
 
 /**
  * Iris 样本的 Spring Data 仓库。
@@ -14,4 +17,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
  * CRUD 和 findAll 方法读取数据。
  */
 public interface IrisRepository extends JpaRepository<IrisSample, Integer> {
+    @Query(value = "SELECT id, SepL, SepW, PetL, PetW, Species FROM iris2", nativeQuery = true)
+    List<IrisSample> findAllFromIris2();
 }
